@@ -1,4 +1,6 @@
-#include <Arduino.h>
+#pragma once
+
+#include "..\Device\RCAIn.h"
 #include <FastLED.h>
 
 class LEDStrip{
