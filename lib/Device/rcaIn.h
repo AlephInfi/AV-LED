@@ -158,6 +158,7 @@ class RCA{
         }
 };
 
+ClockMicros RCA::microsTimer = ClockMicros();
 unsigned int RCA::sampling_period_us = round(1000000 * (1.0 / SAMPLE_RATE));
 int RCA::bandValues[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 int RCA::oldBarHeights[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
