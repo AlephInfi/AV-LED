@@ -13,6 +13,8 @@ void setup(){
 void loop(){
   float ratio = (float)(millis() % 5000) / 5000.0f;
   BTDevice.Update();
+  strip.Update(BTDevice.getValue(), ratio);
+
   Serial.print("Left Reading:  ");
   Serial.print(analogReadRaw(32));
   Serial.print("  Right Reading:  ");
