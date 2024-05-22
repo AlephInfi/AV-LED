@@ -13,17 +13,13 @@
 */
 
 //PINS
-#define LEFT_PIN        25
-#define RIGHT_PIN       26
-#define LEDCLK          14
-#define LEDDAT          2
-#define LED_VOLTS       5
+#define LEFT_PIN        32
+#define RIGHT_PIN       33
 
 #define SAMPLE_RATE     36000 //gives frequencies up to 18kHz
 #define NUM_SAMPLES     1024 //Multiple of 2
 #define BINS            16 //Number of bands
 #define SENSITIVITY     1000
-#define NUM_LEDS        -1 
 
 class RCA{
     private:
@@ -40,21 +36,58 @@ class RCA{
         static unsigned long newTime;
         ArduinoFFT<double> FFTRight = ArduinoFFT<double>(vRealR, vImagR, NUM_SAMPLES, SAMPLE_RATE);
         ArduinoFFT<double> FFTLeft = ArduinoFFT<double>(vRealL, vImagL, NUM_SAMPLES, SAMPLE_RATE);
+
+        float gainR[NUM_SAMPLES];
+        float gainL[NUM_SAMPLES];
+        float gainMono[NUM_SAMPLES];
     public:
-        static float gainR[NUM_SAMPLES];
-        static float gainL[NUM_SAMPLES];
+        float Gain;
+        float GainL;
+        float GainR;
 
         RCA(){}
 
-        static void Sample(){
+        void Sample(){
             for(int i = 0; i < NUM_SAMPLES; i++){
-                gainR[i] = analogReadRaw(RIGHT_PIN);
-                gainL[i] = analogReadRaw(LEFT_PIN);
+                gainR[i] = 10.0f * log(analogReadRaw(RIGHT_PIN));
+                gainL[i] = 10.0f * log(analogReadRaw(LEFT_PIN));
+                gainMono[i] = 10.0f * log((analogReadRaw(RIGHT_PIN) + analogReadRaw(LEFT_PIN)) / 2);
+                Gain += gainMono[i];
+                GainL += gainL[i];
+                GainR += gainR[i];
                 microsTimer.microsDelay(sampling_period_us);
             }
+            Gain /= NUM_SAMPLES;
+            GainL /= NUM_SAMPLES;
+            GainR /= NUM_SAMPLES;
+            if (Gain < -60.0f) Gain = -60.0f;
+            if (Gain > 5.0f) Gain = 5.0f;
+            if (GainL < -60.0f) GainL = -60.0f;
+            if (GainL > 5.0f) GainL = 5.0f;
+            if (GainR < -60.0f) GainR = -60.0f;
+            if (GainR > 5.0f) GainR = 5.0f;
         }
 
-        void FFT(float input[]){
+        //gain raw data
+        float* getAmpMono(){
+            return gainMono;
+        }
+
+        //gain raw data
+        float* getAmpR(){
+            return gainR;
+        }
+
+        //gain raw data
+        float* getAmpL(){
+            return gainL;
+        }
+
+        int getMicrosDelay(){
+            return sampling_period_us;
+        }
+
+        void FFT(){
             for (int i = 0; i < BINS; i++){
                 bandValues[i] = 0;
             }
@@ -115,9 +148,13 @@ class RCA{
 
             /**
              * End results:
-             * barHeight[] stores values of bands in each entry.
+             * bandValues[] stores values of bands in each entry.
              * peak[] is just the max value of each band at a particular instance. Used for visual effects.
             */
+        }
+
+        int getBand(int band){
+            return bandValues[band];
         }
 };
 
