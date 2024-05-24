@@ -1,8 +1,8 @@
 #pragma once
 
-#include "MiniBpm.h"
-#include "RCAIn.h"
-#include "Clock.h"
+#include "..\Utilities\MiniBpm.h"
+#include "..\Device\RCAIn.h"
+#include "..\Utilities\Clock.h"
 
 #define SECS    5 //number of seconds to analyze
 

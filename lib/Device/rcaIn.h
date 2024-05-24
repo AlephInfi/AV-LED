@@ -49,9 +49,9 @@ class RCA{
 
         void Sample(){
             for(int i = 0; i < NUM_SAMPLES; i++){
-                gainR[i] = 10.0f * log(analogReadRaw(RIGHT_PIN));
-                gainL[i] = 10.0f * log(analogReadRaw(LEFT_PIN));
-                gainMono[i] = 10.0f * log((analogReadRaw(RIGHT_PIN) + analogReadRaw(LEFT_PIN)) / 2);
+                gainR[i] = 10.0f * log(analogReadMilliVolts(RIGHT_PIN));
+                gainL[i] = 10.0f * log(analogReadMilliVolts(LEFT_PIN));
+                gainMono[i] = 10.0f * log((analogReadMilliVolts(RIGHT_PIN) + analogReadMilliVolts(LEFT_PIN)) / 2);
                 Gain += gainMono[i];
                 GainL += gainL[i];
                 GainR += gainR[i];

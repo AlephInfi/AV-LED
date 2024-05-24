@@ -1,11 +1,13 @@
-#include "v.h"
-#include "Bluetooth.h"
+#include "..\Visual\v.h"
+#include "..\Device\Bluetooth.h"
 
 Bluetooth BTDevice;
 LEDStrip strip;
 
 void setup(){
   Serial.begin(115200);
+  while (!Serial) {};
+
   BTDevice.BTBegin();
   strip.Init();
 }

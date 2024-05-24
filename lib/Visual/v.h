@@ -1,10 +1,9 @@
 #pragma once
 
-#include "RCAIn.h"
-#include <FastLED.h>
-#include "BPMDetect.h"
+#include <NeoPixelBus.h>
+#include "..\Audio\BPMDetect.h"
 
-#include "SimplexNoise.h"
+#include "..\Materials\SimplexNoise.h"
 
 /* for 4-pin LEDs
 #define LEDCLK          14
@@ -18,20 +17,21 @@
 
 class LEDStrip{
     private:
-        CRGB led[NUM_LEDS];
+        RgbColor led[NUM_LEDS];
 
         RCA rca;
         BPM bpmDetect;
+        NeoPixelBus<NeoGrbFeature, NeoEsp32I2s1X8Ws2812xMethod> LED = NeoPixelBus<NeoGrbFeature, NeoEsp32I2s1X8Ws2812xMethod>(NUM_LEDS, LEDPIN);
 
         RGBColor noiseSpectrum[4] = {RGBColor(0, 255, 0), RGBColor(255, 0, 0), RGBColor(0, 255, 0), RGBColor(0, 0, 255)};
         GradientMaterial gNoiseMat = GradientMaterial(4, noiseSpectrum, 2.0f, false);
         SimplexNoise sNoise = SimplexNoise(1, &gNoiseMat);
 
-        CRGB RGBColorToCRGB(RGBColor color){
-            CRGB crgb;
-            crgb.r = color.R;
-            crgb.g = color.G;
-            crgb.b = color.B;
+        RgbColor RGBColorToRgb(RGBColor color){ //NeoBus method
+            RgbColor crgb;
+            crgb.R = color.R;
+            crgb.G = color.G;
+            crgb.B = color.B;
             return crgb;
         }
 
@@ -60,7 +60,7 @@ class LEDStrip{
                 sNoise.SetZPosition(x * 4.0f);
 
                 for(int num = 0; num < NUM_LEDS; num++){
-                    CRGB pixel = RGBColorToCRGB(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
+                    RgbColor pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
                     led[num] = pixel;
                 }
             }
@@ -71,17 +71,17 @@ class LEDStrip{
         void Pulse(uint8_t amplitude){
             int t = 0;
             int beatGap = (int)(60000.0f / bpmDetect.GetBPM()); // in milliseconds
-            CRGB savedLEDState[NUM_LEDS];
+            RgbColor savedLEDState[NUM_LEDS];
             for(int num = 0; num < NUM_LEDS; num++){
-                CRGB pixel = RGBColorToCRGB(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
+                RgbColor pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
                 savedLEDState[num] = pixel;
-                pixel.addToRGB(amplitude);
+                pixel.Lighten(amplitude);
                 led[num] = pixel;
             }
             while(t < beatGap){
                 for(int num = 0; num < NUM_LEDS; num++){
-                    CRGB pixel = RGBColorToCRGB(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
-                    pixel.addToRGB((-1 * amplitude / beatGap));
+                    RgbColor pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
+                    pixel.Lighten((-1 * amplitude / beatGap));
                     led[num] = pixel;
                 }
                 t += 1; // millisecond
@@ -92,8 +92,7 @@ class LEDStrip{
         LEDStrip(){}
 
         void Init(){
-            FastLED.addLeds<NEOPIXEL, LEDPIN>(led, NUM_LEDS);
-            FastLED.setBrightness(150);
+            LED.Begin();
         }
 
         void Update(int command, float ratio){
@@ -112,7 +111,7 @@ bool tmp; // placehold
 
             if(command == 6) On(tmp);
             if(command == 7) Off(tmp);
-
-            FastLED.show();
+            
+            LED.Show();
         }
 };

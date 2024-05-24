@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RGBColor.h"
+#include "..\Materials\RGBColor.h"
 #include "..\Math\Vector3D.h"
 
 class Material{
