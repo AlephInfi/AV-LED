@@ -28,6 +28,14 @@ class LEDStrip{
         GradientMaterial gNoiseMat = GradientMaterial(4, noiseSpectrum, 2.0f, false);
         SimplexNoise sNoise = SimplexNoise(1, &gNoiseMat);
 
+        // do cool bpm effect with color switching
+        SimplexNoise GenRandTwoColorSimplex(){
+            RGBColor noiseSpectrum[2] = {RGBColor(255 - random8(120), 255 - random8(120), 255 - random8(120)), RGBColor(255 - random8(120), 255 - random8(120), 255 - random8(120))};
+            GradientMaterial gNoiseMat = GradientMaterial(4, noiseSpectrum, 2.0f, false);
+            SimplexNoise sNoise = SimplexNoise(1, &gNoiseMat);
+            return sNoise;
+        }
+
         void Simplex(float ratio){
             float x = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * 2.0f);
 
@@ -57,21 +65,23 @@ class LEDStrip{
             sNoise.SetScale(Vector3D(sShift, sShift, sShift));
             sNoise.SetZPosition(x * 4.0f);
 
-            float Rmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(2), 0.0f, 120.0f), 0.0f, 120.0f, 0.5f, 6.0f);
-            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(5), 0.0f, 100.0f), 0.0f, 100.0f, 0.5f, 3.0f);
-            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(13), 0.0f, 350.0f), 0.0f, 350.0f, 0.5f, 2.0f);
-            float UMult = rca.getGainL(0.1f);
+            float Rmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(1), 0.0f, 120.0f), 0.0f, 120.0f, 0.5f, 16.0f);
+            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(9), 0.0f, 100.0f), 0.0f, 100.0f, 0.5f, 10.0f);
+            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(15), 0.0f, 350.0f), 0.0f, 350.0f, 0.5f, 8.0f);
+            float UMult = rca.getGainL(0.2f);
 
-            Serial.print(rca.getBand(2));
+            Serial.print(analogRead(21));
             Serial.print("     ");
-            Serial.print(rca.getBand(5));
+            Serial.print(Gmult);
             Serial.print("     ");
-            Serial.print(rca.getBand(13));
+            Serial.print(Bmult);
             Serial.print("     ");
             Serial.println(UMult);
 
+            FastLED.setBrightness((uint8_t)Mathematics::Constrain((Rmult / 16.0f * 255.0f), 10.0f, 190.0f));
+
             for(int num = 0; num < NUM_LEDS; num++){
-                CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
+                CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
                 RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
                 pixel.r = (uint8_t) (Rmult * refpixel.R * UMult);
                 pixel.g = (uint8_t) (Gmult * refpixel.G * UMult);

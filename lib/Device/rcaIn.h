@@ -13,8 +13,8 @@
 */
 
 //PINS
-#define LEFT_PIN        20
-#define RIGHT_PIN       21
+#define LEFT_PIN        22
+#define RIGHT_PIN       23
 
 #define SAMPLE_RATE     36000 //gives frequencies up to 18kHz
 #define NUM_SAMPLES     1024 //Multiple of 2

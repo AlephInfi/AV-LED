@@ -12,10 +12,10 @@ float* doubToFloatArr(double array[]){
     return ret;
 }
 
-CRGB RGBColorToRgb(RGBColor color){ //NeoBus method
+CRGB RGBColorToRgb(RGBColor color, float multiplier = 1.0f){ //NeoBus method
             CRGB crgb;
-            crgb.r = color.R;
-            crgb.g = color.G;
-            crgb.b = color.B;
+            crgb.r = round(color.R * multiplier);
+            crgb.g = round(color.G * multiplier);
+            crgb.b = round(color.B * multiplier);
             return crgb;
         }

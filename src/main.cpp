@@ -34,4 +34,5 @@ void setup(){
 void loop(){
   float ratio = (float)(millis() % 5000) / 5000.0f;
   strip.Update(1, ratio);
+  
 }
