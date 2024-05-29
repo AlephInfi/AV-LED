@@ -13,8 +13,8 @@
 */
 
 //PINS
-#define LEFT_PIN        32
-#define RIGHT_PIN       33
+#define LEFT_PIN        20
+#define RIGHT_PIN       21
 
 #define SAMPLE_RATE     36000 //gives frequencies up to 18kHz
 #define NUM_SAMPLES     1024 //Multiple of 2
@@ -31,56 +31,46 @@ class RCA{
         static int bandValues[BINS];
         double vRealL[NUM_SAMPLES];
         double vImagL[NUM_SAMPLES];
-        double vRealR[NUM_SAMPLES];
-        double vImagR[NUM_SAMPLES];
+        //double vRealR[NUM_SAMPLES];
+        //double vImagR[NUM_SAMPLES];
         static unsigned long newTime;
-        ArduinoFFT<double> FFTRight = ArduinoFFT<double>(vRealR, vImagR, NUM_SAMPLES, SAMPLE_RATE);
+        //ArduinoFFT<double> FFTRight = ArduinoFFT<double>(vRealR, vImagR, NUM_SAMPLES, SAMPLE_RATE);
         ArduinoFFT<double> FFTLeft = ArduinoFFT<double>(vRealL, vImagL, NUM_SAMPLES, SAMPLE_RATE);
 
-        float gainR[NUM_SAMPLES];
-        float gainL[NUM_SAMPLES];
-        float gainMono[NUM_SAMPLES];
+        double gainMono;
     public:
-        float Gain;
-        float GainL;
-        float GainR;
+        //double AvGain;
+        double AvGainL;
+        //double AvGainR;
 
         RCA(){}
 
         void Sample(){
             for(int i = 0; i < NUM_SAMPLES; i++){
-                gainR[i] = 10.0f * log(analogReadMilliVolts(RIGHT_PIN));
-                gainL[i] = 10.0f * log(analogReadMilliVolts(LEFT_PIN));
-                gainMono[i] = 10.0f * log((analogReadMilliVolts(RIGHT_PIN) + analogReadMilliVolts(LEFT_PIN)) / 2);
-                Gain += gainMono[i];
-                GainL += gainL[i];
-                GainR += gainR[i];
-                microsTimer.microsDelay(sampling_period_us);
+                //vRealR[i] = analogRead(RIGHT_PIN);
+                vRealL[i] = analogRead(LEFT_PIN) / 200;
+                //AvGain += gainMono[i];
+                AvGainL += vRealL[i];
+                //AvGainR += gainR[i];
+                vImagL[i] = 0;
+                //vImagR[i] = 0;
+                while (!microsTimer.microsDelay(sampling_period_us)) {};
             }
-            Gain /= NUM_SAMPLES;
-            GainL /= NUM_SAMPLES;
-            GainR /= NUM_SAMPLES;
-            if (Gain < -60.0f) Gain = -60.0f;
-            if (Gain > 5.0f) Gain = 5.0f;
-            if (GainL < -60.0f) GainL = -60.0f;
-            if (GainL > 5.0f) GainL = 5.0f;
-            if (GainR < -60.0f) GainR = -60.0f;
-            if (GainR > 5.0f) GainR = 5.0f;
+            //AvGain /= NUM_SAMPLES;
+            AvGainL /= NUM_SAMPLES;
+            //AvGainR /= NUM_SAMPLES;
+            //Mathematics::Constrain(AvGainL, -60.0f, 5.0f);
+            //Mathematics::Constrain(AvGainR, -60.0f, 5.0f);
+            //Mathematics::Constrain(AvGain, -60.0f, 5.0f);
         }
 
         //gain raw data
-        float* getAmpMono(){
-            return gainMono;
+        double* getAmpL(){
+            return vRealL;
         }
 
-        //gain raw data
-        float* getAmpR(){
-            return gainR;
-        }
-
-        //gain raw data
-        float* getAmpL(){
-            return gainL;
+        double getGainL(double multiplier = 1.0f){
+            return AvGainL * multiplier;
         }
 
         int getMicrosDelay(){
@@ -91,15 +81,18 @@ class RCA{
             for (int i = 0; i < BINS; i++){
                 bandValues[i] = 0;
             }
-            FFTLeft.dcRemoval();
+            FFTLeft.dcRemoval(vRealL, NUM_SAMPLES);
             FFTLeft.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
             FFTLeft.compute(FFT_FORWARD);
             FFTLeft.complexToMagnitude();
+
+            double peakL = FFTLeft.majorPeak(vRealL, NUM_SAMPLES, SAMPLE_RATE);
+            //double peakR = FFTRight.majorPeak(gainR(), NUM_SAMPLES, SAMPLE_RATE);
             
-            FFTRight.dcRemoval();
-            FFTRight.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-            FFTRight.compute(FFT_FORWARD);
-            FFTRight.complexToMagnitude();
+            //FFTRight.dcRemoval();
+            //FFTRight.windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+            //FFTRight.compute(FFT_FORWARD);
+            //FFTRight.complexToMagnitude();
 
             for (int i = 2; i < (NUM_SAMPLES / 2); i++){
                 /*8 bands, 12kHz top band
@@ -155,6 +148,10 @@ class RCA{
 
         int getBand(int band){
             return bandValues[band];
+        }
+
+        int* getBandArr(){
+            return bandValues;
         }
 };
 

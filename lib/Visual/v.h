@@ -1,6 +1,6 @@
 #pragma once
 
-#include <NeoPixelBus.h>
+#include <FastLED.h>
 #include "..\Audio\BPMDetect.h"
 
 #include "..\Materials\SimplexNoise.h"
@@ -10,59 +10,73 @@
 #define LEDDAT          2
 */
 #define LED_VOLTS       5
-#define LEDPIN          13
-#define NUM_LEDS        1
+#define LEDPIN          14
+#define NUM_LEDS        303
 
 #define PULSE_SCALAR    10 //Controls the brightness increase of LEDs when pulsing
 
 class LEDStrip{
     private:
-        RgbColor led[NUM_LEDS];
+        CRGB led[NUM_LEDS];
+
+        ClockMicros microClock;
 
         RCA rca;
         BPM bpmDetect;
-        NeoPixelBus<NeoGrbFeature, NeoEsp32I2s1X8Ws2812xMethod> LED = NeoPixelBus<NeoGrbFeature, NeoEsp32I2s1X8Ws2812xMethod>(NUM_LEDS, LEDPIN);
 
         RGBColor noiseSpectrum[4] = {RGBColor(0, 255, 0), RGBColor(255, 0, 0), RGBColor(0, 255, 0), RGBColor(0, 0, 255)};
         GradientMaterial gNoiseMat = GradientMaterial(4, noiseSpectrum, 2.0f, false);
         SimplexNoise sNoise = SimplexNoise(1, &gNoiseMat);
 
-        RgbColor RGBColorToRgb(RGBColor color){ //NeoBus method
-            RgbColor crgb;
-            crgb.R = color.R;
-            crgb.G = color.G;
-            crgb.B = color.B;
-            return crgb;
-        }
-
-        //Function states:
-        bool SimplexState = false;
-
-        void On(bool index){
-            index = true;
-        }
-
-        void Off(bool index){
-            index = false;
-        }
-
         void Simplex(float ratio){
-            if(SimplexState = true){
-                float x = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * 2.0f);
-                float y = 0.5f * cosf(ratio * 3.14159f / 180.0f * 360.0f * 3.0f);
+            float x = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * 2.0f);
 
-                float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
-                float sShift = linSweep * 0.002f + 0.005f;
+            float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
+            float sShift = linSweep * 0.002f + 0.005f;
 
-                gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
-                gNoiseMat.HueShift(ratio * 360 * 2);
-                sNoise.SetScale(Vector3D(sShift, sShift, sShift));
-                sNoise.SetZPosition(x * 4.0f);
+            gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
+            gNoiseMat.HueShift(ratio * 360 * 2);
+            sNoise.SetScale(Vector3D(sShift, sShift, sShift));
+            sNoise.SetZPosition(x * 4.0f);
 
-                for(int num = 0; num < NUM_LEDS; num++){
-                    RgbColor pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
-                    led[num] = pixel;
-                }
+            for(int num = 0; num < NUM_LEDS; num++){
+                CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
+                led[num] = pixel;
+            }
+        }
+
+        void SimplexWithAudioMod(float ratio){
+            float x = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * 2.0f);
+            //float y = 0.5f * cosf(ratio * 3.14159f / 180.0f * 360.0f * 3.0f);
+
+            float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
+            float sShift = linSweep * 0.002f + 0.005f;
+
+            gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
+            gNoiseMat.HueShift(ratio * 360 * 2);
+            sNoise.SetScale(Vector3D(sShift, sShift, sShift));
+            sNoise.SetZPosition(x * 4.0f);
+
+            float Rmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(2), 0.0f, 120.0f), 0.0f, 120.0f, 0.5f, 6.0f);
+            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(5), 0.0f, 100.0f), 0.0f, 100.0f, 0.5f, 3.0f);
+            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(13), 0.0f, 350.0f), 0.0f, 350.0f, 0.5f, 2.0f);
+            float UMult = rca.getGainL(0.1f);
+
+            Serial.print(rca.getBand(2));
+            Serial.print("     ");
+            Serial.print(rca.getBand(5));
+            Serial.print("     ");
+            Serial.print(rca.getBand(13));
+            Serial.print("     ");
+            Serial.println(UMult);
+
+            for(int num = 0; num < NUM_LEDS; num++){
+                CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
+                RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
+                pixel.r = (uint8_t) (Rmult * refpixel.R * UMult);
+                pixel.g = (uint8_t) (Gmult * refpixel.G * UMult);
+                pixel.b = (uint8_t) (Bmult * refpixel.B * UMult);
+                led[num] = pixel;
             }
         }
 
@@ -71,47 +85,60 @@ class LEDStrip{
         void Pulse(uint8_t amplitude){
             int t = 0;
             int beatGap = (int)(60000.0f / bpmDetect.GetBPM()); // in milliseconds
-            RgbColor savedLEDState[NUM_LEDS];
+            CRGB savedLEDState[NUM_LEDS];
             for(int num = 0; num < NUM_LEDS; num++){
-                RgbColor pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
+                CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
                 savedLEDState[num] = pixel;
-                pixel.Lighten(amplitude);
+                pixel.addToRGB(amplitude);
                 led[num] = pixel;
             }
             while(t < beatGap){
                 for(int num = 0; num < NUM_LEDS; num++){
-                    RgbColor pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
-                    pixel.Lighten((-1 * amplitude / beatGap));
+                    CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
+                    pixel.addToRGB((-1 * amplitude / beatGap));
                     led[num] = pixel;
                 }
                 t += 1; // millisecond
             }
         }
 
+        void PulseBeat(float ratio){
+            float x = 0.5f * 1 / (ratio);
+
+            double BPM = bpmDetect.GetBPM();
+        }
+
     public:
         LEDStrip(){}
 
         void Init(){
-            LED.Begin();
+            FastLED.addLeds<WS2812B, LEDPIN, GRB>(led, NUM_LEDS);
+            FastLED.setBrightness(120);
+        }
+
+        void setLED(uint16_t pixel, RGBColor color){
+            led[pixel].r = color.R;
+            led[pixel].g = color.G;
+            led[pixel].b = color.B;
+        }
+        void ManualShow(){
+            FastLED.show();
+        }
+
+        double getBand(uint8_t band){
+            return rca.getBand(band);
         }
 
         void Update(int command, float ratio){
             rca.Sample();
             rca.FFT();
-            bpmDetect.Update(rca);
+            //bpmDetect.Update(rca); // Mem overflow?
 
-            if(command == 0) On(SimplexState);
-            if(command == 1) Off(SimplexState);
-bool tmp; // placehold
-            if(command == 2) On(tmp);
-            if(command == 3) Off(tmp);
+            switch(command){
+                case 0: Simplex(ratio);
+                case 1: SimplexWithAudioMod(ratio);
+            }
 
-            if(command == 4) On(tmp);
-            if(command == 5) Off(tmp);
-
-            if(command == 6) On(tmp);
-            if(command == 7) Off(tmp);
-            
-            LED.Show();
+            FastLED.show();
         }
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "..\Utilities\MiniBpm.h"
+#include "..\Utilities\Conversions.h"
 #include "..\Device\RCAIn.h"
 #include "..\Utilities\Clock.h"
 
@@ -15,10 +16,10 @@ class BPM{
     public:
         BPM(){};
 
-        void Update(RCA rca){
+        void Update(RCA &rca){
             unsigned long p = millis();
             while(millis() - p < SECS * 1000){
-                bpm.process(rca.getAmpMono(), NUM_SAMPLES);
+                bpm.process(doubToFloatArr(rca.getAmpL()), NUM_SAMPLES);
                 timer.millissDelay(rca.getMicrosDelay() * 1000);
                 CurrentBPM = bpm.estimateTempo();
             }

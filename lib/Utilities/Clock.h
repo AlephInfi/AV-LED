@@ -8,9 +8,10 @@ class ClockMicros{
         ClockMicros(){
             prevTime = micros();
         }
-        void microsDelay(int delayMicros){
+        bool microsDelay(int delayMicros){
             while(micros() - prevTime < delayMicros){}
             prevTime = micros();
+            return true;
         }
 
 };
@@ -22,9 +23,10 @@ class ClockMillis{
         ClockMillis(){
             prevTime = millis();
         }
-        void millissDelay(int delayMillis){
+        bool millissDelay(int delayMillis){
             while(micros() - prevTime < delayMillis){}
             prevTime = micros();
+            return true;
         }
 
 };
