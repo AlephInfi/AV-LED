@@ -29,13 +29,13 @@ class RCA{
         static byte peak[BINS];              // The length of these arrays must be >= NUM_BANDS
         static int oldBarHeights[BINS];
         static int bandValues[BINS];
-        double vRealL[NUM_SAMPLES];
-        double vImagL[NUM_SAMPLES];
+        float vRealL[NUM_SAMPLES];
+        float vImagL[NUM_SAMPLES];
         //double vRealR[NUM_SAMPLES];
         //double vImagR[NUM_SAMPLES];
         static unsigned long newTime;
         //ArduinoFFT<double> FFTRight = ArduinoFFT<double>(vRealR, vImagR, NUM_SAMPLES, SAMPLE_RATE);
-        ArduinoFFT<double> FFTLeft = ArduinoFFT<double>(vRealL, vImagL, NUM_SAMPLES, SAMPLE_RATE);
+        ArduinoFFT<float> FFTLeft = ArduinoFFT<float>(vRealL, vImagL, NUM_SAMPLES, SAMPLE_RATE);
 
         double gainMono;
     public:
@@ -47,8 +47,8 @@ class RCA{
 
         void Sample(){
             for(int i = 0; i < NUM_SAMPLES; i++){
-                //vRealR[i] = analogRead(RIGHT_PIN);
-                vRealL[i] = analogRead(LEFT_PIN) / 200;
+                //vRealR[i] = analogRead(RIGHT_PIN) / 200.0f;
+                vRealL[i] = analogRead(LEFT_PIN) / 200.0f;
                 //AvGain += gainMono[i];
                 AvGainL += vRealL[i];
                 //AvGainR += gainR[i];
@@ -65,7 +65,7 @@ class RCA{
         }
 
         //gain raw data
-        double* getAmpL(){
+        float* getAmpL(){
             return vRealL;
         }
 

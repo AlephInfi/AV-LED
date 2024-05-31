@@ -3,13 +3,12 @@
 #include "..\Utilities\MiniBpm.h"
 #include "..\Utilities\Conversions.h"
 #include "..\Device\RCAIn.h"
-#include "..\Utilities\Clock.h"
 
 #define SECS    5 //number of seconds to analyze
 
 class BPM{
     private:
-        MiniBPM bpm = MiniBPM(SAMPLE_RATE);
+        MiniBPM bpm = MiniBPM((float)SAMPLE_RATE);
         double CurrentBPM = 140; //common BPM to start with
         ClockMillis timer;
 
@@ -17,12 +16,13 @@ class BPM{
         BPM(){};
 
         void Update(RCA &rca){
-            unsigned long p = millis();
-            while(millis() - p < SECS * 1000){
-                bpm.process(doubToFloatArr(rca.getAmpL()), NUM_SAMPLES);
-                timer.millissDelay(rca.getMicrosDelay() * 1000);
-                CurrentBPM = bpm.estimateTempo();
-            }
+            bpm.process(rca.getAmpL(), (int)NUM_SAMPLES);
+            CurrentBPM = bpm.estimateTempo();
+            Serial.println("BPM Success!");
+        }
+
+        void SetRange(double lowerLim = 55.0f, double upperLim = 180.0f){
+            bpm.setBPMRange(lowerLim, upperLim);
         }
 
         //return bpm estimate

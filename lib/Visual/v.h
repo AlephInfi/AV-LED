@@ -11,9 +11,9 @@
 */
 #define LED_VOLTS       5
 #define LEDPIN          14
-#define NUM_LEDS        303
+#define NUM_LEDS        600
 
-#define PULSE_SCALAR    10 //Controls the brightness increase of LEDs when pulsing
+#define MAX_BRIGHTNESS    190 //Miximum brightness
 
 class LEDStrip{
     private:
@@ -27,6 +27,12 @@ class LEDStrip{
         RGBColor noiseSpectrum[4] = {RGBColor(0, 255, 0), RGBColor(255, 0, 0), RGBColor(0, 255, 0), RGBColor(0, 0, 255)};
         GradientMaterial gNoiseMat = GradientMaterial(4, noiseSpectrum, 2.0f, false);
         SimplexNoise sNoise = SimplexNoise(1, &gNoiseMat);
+
+        float LowMax = 0.0f;
+        float MidMax = 0.0f;
+        float HighMax = 0.0f;
+
+        unsigned long prevmillis = 0;
 
         // do cool bpm effect with color switching
         SimplexNoise GenRandTwoColorSimplex(){
@@ -65,20 +71,12 @@ class LEDStrip{
             sNoise.SetScale(Vector3D(sShift, sShift, sShift));
             sNoise.SetZPosition(x * 4.0f);
 
-            float Rmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(1), 0.0f, 120.0f), 0.0f, 120.0f, 0.5f, 16.0f);
-            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(9), 0.0f, 100.0f), 0.0f, 100.0f, 0.5f, 10.0f);
-            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(15), 0.0f, 350.0f), 0.0f, 350.0f, 0.5f, 8.0f);
+            float Rmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(0), 0.03f, LowMax), 0.01f, LowMax, 1.0f, 10.0f);
+            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(7), 0.03f, MidMax), 0.01f, MidMax, 1.0f, 6.0f);
+            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(15), 0.03f, HighMax), 0.01f, HighMax, 1.0f, 4.0f);
             float UMult = rca.getGainL(0.2f);
 
-            Serial.print(analogRead(21));
-            Serial.print("     ");
-            Serial.print(Gmult);
-            Serial.print("     ");
-            Serial.print(Bmult);
-            Serial.print("     ");
-            Serial.println(UMult);
-
-            FastLED.setBrightness((uint8_t)Mathematics::Constrain((Rmult / 16.0f * 255.0f), 10.0f, 190.0f));
+            FastLED.setBrightness((uint8_t)Mathematics::Constrain((Rmult / 16.0f * 255.0f), 1.0f, 200.0f));
 
             for(int num = 0; num < NUM_LEDS; num++){
                 CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
@@ -90,32 +88,54 @@ class LEDStrip{
             }
         }
 
-        //Use this for pulse amp? uint scalar = Mathematics::Constrain(((uint)Mathematics::Map(rca.Gain, -60.0f, 5.0f, 0.0f, 255.0f)), 0, 255);
+        void AudioPulse(float ratio){
+            float x = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * 2.0f);
 
-        void Pulse(uint8_t amplitude){
-            int t = 0;
-            int beatGap = (int)(60000.0f / bpmDetect.GetBPM()); // in milliseconds
-            CRGB savedLEDState[NUM_LEDS];
+            float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
+            float sShift = linSweep * 0.002f + 0.005f;
+
+            gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
+            gNoiseMat.HueShift(ratio * 360 * 2);
+            sNoise.SetScale(Vector3D(sShift, sShift, sShift));
+            sNoise.SetZPosition(x * 4.0f);
+
+            float Rmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(0), 0.03f, LowMax), 0.01f, LowMax, 1.0f, 10.0f);
+            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(7), 0.03f, MidMax), 0.01f, MidMax, 1.0f, 6.0f);
+            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(15), 0.03f, HighMax), 0.01f, HighMax, 1.0f, 4.0f);
+
+            Serial.print(Rmult);
+            Serial.print("\t");
+            Serial.print(Gmult);
+            Serial.print("\t");
+            Serial.print(Bmult);
+            Serial.print("\t");
+            Serial.print(FastLED.getBrightness());
+            Serial.print("\t");
+            Serial.println(FastLED.getFPS());
+
+            FastLED.setBrightness((uint8_t)Mathematics::Map((Rmult * 0.1f * MAX_BRIGHTNESS), (0.1f * MAX_BRIGHTNESS), MAX_BRIGHTNESS, 3, MAX_BRIGHTNESS));
+
             for(int num = 0; num < NUM_LEDS; num++){
-                CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
-                savedLEDState[num] = pixel;
-                pixel.addToRGB(amplitude);
+                CRGB pixel;
+                RGBColor refpixel = sNoise.GetRGB(Vector3D(num / 5.0f,num / 2.0f,num / 3.0f), Vector3D(), Vector3D());
+                if (rca.getBand(0) >= rca.getBand(7) && rca.getBand(0) >= rca.getBand(15)){
+                    pixel.r = (uint8_t) (refpixel.R * Rmult);
+                    pixel.g = (uint8_t) (refpixel.G / (8.0f * Gmult));
+                    pixel.b = (uint8_t) (refpixel.B / (8.0f * Bmult));
+                }
+                if (rca.getBand(7) >= rca.getBand(0) && rca.getBand(7) >= rca.getBand(15)){
+                    pixel.r = (uint8_t) (refpixel.R / Rmult);
+                    pixel.g = (uint8_t) (refpixel.G * 0.25f * Gmult);
+                    pixel.b = (uint8_t) (refpixel.B / (4.0f * Bmult));
+                }
+                else{
+                    pixel.r = (uint8_t) (refpixel.R / Rmult);
+                    pixel.g = (uint8_t) (refpixel.G / (4.0f * Gmult));
+                    pixel.b = (uint8_t) (refpixel.B * 0.25f * Bmult);
+                }
+                
                 led[num] = pixel;
             }
-            while(t < beatGap){
-                for(int num = 0; num < NUM_LEDS; num++){
-                    CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()));
-                    pixel.addToRGB((-1 * amplitude / beatGap));
-                    led[num] = pixel;
-                }
-                t += 1; // millisecond
-            }
-        }
-
-        void PulseBeat(float ratio){
-            float x = 0.5f * 1 / (ratio);
-
-            double BPM = bpmDetect.GetBPM();
         }
 
     public:
@@ -123,7 +143,9 @@ class LEDStrip{
 
         void Init(){
             FastLED.addLeds<WS2812B, LEDPIN, GRB>(led, NUM_LEDS);
-            FastLED.setBrightness(120);
+            FastLED.setBrightness(0);
+
+            bpmDetect.SetRange();
         }
 
         void setLED(uint16_t pixel, RGBColor color){
@@ -144,9 +166,21 @@ class LEDStrip{
             rca.FFT();
             //bpmDetect.Update(rca); // Mem overflow?
 
+            if(rca.getBand(0) > LowMax) LowMax = rca.getBand(0);
+            if(rca.getBand(7) > MidMax) MidMax = rca.getBand(7);
+            if(rca.getBand(15) > HighMax) HighMax = rca.getBand(15);
+
+            if(millis() - prevmillis >= 5000){
+                if(rca.getBand(0) > 1) LowMax = 0.1f;
+                if(rca.getBand(7) > 1) MidMax = 0.1f;
+                if(rca.getBand(15) > 1) HighMax = 0.1f;
+                prevmillis = millis();
+            }
+
             switch(command){
                 case 0: Simplex(ratio);
                 case 1: SimplexWithAudioMod(ratio);
+                case 2: AudioPulse(ratio);
             }
 
             FastLED.show();
