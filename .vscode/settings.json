@@ -4,6 +4,8 @@
         "typeinfo": "cpp",
         "functional": "cpp",
         "tuple": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "*.tpp": "cpp",
+        "ratio": "cpp"
     }
 }
