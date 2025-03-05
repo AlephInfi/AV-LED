@@ -23,9 +23,9 @@ class LEDStrip{
         RCA rca;
         BPM bpmDetect;
 
-        RGBColor noiseSpectrum[4] = {RGBColor(0, 255, 0), RGBColor(255, 0, 0), RGBColor(0, 255, 0), RGBColor(0, 0, 255)};
-        GradientMaterial gNoiseMat = GradientMaterial(4, noiseSpectrum, 2.0f, false);
-        SimplexNoise sNoise = SimplexNoise(1, &gNoiseMat);
+        RGBColor noiseSpectrum[2] = {RGBColor(0, 255, 0), RGBColor(255, 0, 0)};
+        GradientMaterial gNoiseMat = GradientMaterial(2, noiseSpectrum, 2.0f, false);
+        SimplexNoise sNoise = SimplexNoise(71485, &gNoiseMat);
         float currentHue = 0.0f;
 
         float LowMax = 0.0f;
@@ -73,8 +73,8 @@ class LEDStrip{
             float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
             float sShift = linSweep * 0.001f + 0.002f;
 
-            float Rmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(0), 0.03f, LowMax), 0.01f, LowMax, 1.0f, 10.0f);
-            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(6), 0.03f, MidMax), 0.01f, MidMax, 1.0f, 6.0f);
+            float Rmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(0), 0.03f, LowMax), 0.01f, LowMax, 0.1f, 10.0f);
+            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(6), 0.03f, MidMax), 0.01f, MidMax, 0.5f, 6.0f);
             float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(15), 0.03f, HighMax), 0.01f, HighMax, 1.0f, 4.0f);
             float UMult = rca.getGainL(0.2f);
 
@@ -96,13 +96,15 @@ class LEDStrip{
 
             this->currentBrightess = (uint8_t)Mathematics::Constrain((Rmult / 10.0f * MAX_BRIGHTNESS), this->MinBright, MAX_BRIGHTNESS);
 
+            //this->currentBrightess = (uint8_t)(-100.0f/ (currentBrightess - LowMax - 100.0f) - 0.909090909091f);
+
             if( ((LowMax - rca.getBand(0)) < this->RunningAverageDiff * 2.5) && (LowMax > 150)){
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)(currentBrightess + 50), this->MinBright, MAX_BRIGHTNESS));
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)((currentBrightess + 60)*Rmult/10), this->MinBright, MAX_BRIGHTNESS));
                 if (millis() - prevmillis >= 300){
-                    gNoiseMat.HueShift(23);
-                    currentHue += 23;
+                    gNoiseMat.HueShift(13);
+                    currentHue += 13;
                     if (currentHue >= 360.0f){
-                        currentHue -= 337.0f;
+                        currentHue -= 347.0f;
                     }
                     Serial.println("trigger");
                 }

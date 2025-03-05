@@ -19,7 +19,7 @@
 #define SAMPLE_RATE     36000 //gives frequencies up to 18kHz
 #define NUM_SAMPLES     1024 //Multiple of 2
 #define BINS            16 //Number of bands
-#define SENSITIVITY     1000
+#define SENSITIVITY     1
 
 class RCA{
     private:

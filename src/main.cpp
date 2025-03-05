@@ -6,7 +6,7 @@ void setup(){
   Serial.begin(115200);
   delay(1000);
 
-  strip.Init(3);
+  strip.Init(10);
 }
 
 void loop(){
