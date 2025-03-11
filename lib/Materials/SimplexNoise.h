@@ -69,11 +69,11 @@ private:
     }
   
 public:
-    SimplexNoise(int seed, GradientMaterial* gradientMaterial) {
+    SimplexNoise(uint16_t seed, GradientMaterial* gradientMaterial) {
         this->gradientMaterial = gradientMaterial;
         
         //the seed determines the swaps that occur between the default order and the order we're actually going to use
-        for(int i = 0; i < 400; i++){
+        for(int i = 0; i < (int)(seed/110 + 400); i++){
             uint8_t swapFrom = rand() % 256;
             uint8_t swapTo = rand() % 256;
             

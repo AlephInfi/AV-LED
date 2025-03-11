@@ -6,6 +6,7 @@
         "tuple": "cpp",
         "cmath": "cpp",
         "*.tpp": "cpp",
-        "ratio": "cpp"
+        "ratio": "cpp",
+        "random": "cpp"
     }
 }

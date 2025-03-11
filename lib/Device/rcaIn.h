@@ -46,6 +46,7 @@ class RCA{
         RCA(){}
 
         void Sample(){
+            AvGainL = 0;
             for(int i = 0; i < NUM_SAMPLES; i++){
                 //vRealR[i] = analogRead(RIGHT_PIN) / 200.0f;
                 vRealL[i] = analogRead(LEFT_PIN) / 200.0f;
@@ -71,6 +72,14 @@ class RCA{
 
         double getGainL(double multiplier = 1.0f){
             return AvGainL * multiplier;
+        }
+
+        float getBandAvg(){
+            int total;
+            for (int i = 0; i < BINS; i++){
+                total += bandValues[i];
+            }
+            return (total / BINS);
         }
 
         int getMicrosDelay(){
