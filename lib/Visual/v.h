@@ -115,7 +115,7 @@ class LEDStrip{
                 }
             }        
             else if( ((LowMax - lLow) > this->RunningAverageDiff * 2.5f) && ((LowMax - lLow) < this->RunningAverageDiff * 3.1f) && (rca.getBandAvg() > 60)){
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain(currentBrightess * 0.55f, this->MinBright, currentBrightess*Rmult/10));
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain(currentBrightess * 0.55f, this->MinBright, MAX_BRIGHTNESS));
 
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
@@ -127,7 +127,7 @@ class LEDStrip{
                 }
             }
             else{
-                FastLED.setBrightness((uint8_t)(Mathematics::Constrain(currentBrightess * 0.4f, this->MinBright, currentBrightess*Rmult/12)));
+                FastLED.setBrightness((uint8_t)(Mathematics::Constrain(currentBrightess * 0.4f, this->MinBright, MAX_BRIGHTNESS)));
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
                     RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
