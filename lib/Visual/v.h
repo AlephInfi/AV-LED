@@ -53,6 +53,10 @@ class LEDStrip{
             return sNoise;
         }
 
+        float GrayScale(float R, float G, float B, float saturation){
+            return saturation * (R + G + B)/3 - currentBrightess*60/255;
+        }
+
         void Simplex(float ratio){
             float x = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * 2.0f);
 
@@ -72,16 +76,16 @@ class LEDStrip{
 
         void SimplexWithAudioMod(float ratio){
             
-            float x = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * 1 / 5);
-            float y = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * MultiplierRandY / 5 + MultiplierRandY*50);
-            float z = 0.5f * sinf(ratio * 3.14159f / 180.0f * 360.0f * MultiplierRandZ / 5 + MultiplierRandZ*100);
+            float x = 0.5f * sinf(ratio * 2 * 3.14159f) + 0.5f;
+            float y = 0.5f * sinf(ratio * 4 * 3.14159f + MultiplierRandY*50) + 0.5f;
+            float z = 0.5f * sinf(ratio * 2 * 3.14159f + MultiplierRandZ*100) + 0.5f;
 
             float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
             float sShift = linSweep * 0.001f + 0.002f;
 
             float Rmult = Mathematics::Map(Mathematics::Constrain(lLow, 0.03f, LowMax), 0.01f, LowMax, 0.3f, 10.0f);
-            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(7), 0.03f, MidMax), 0.01f, MidMax, 0.5f, 6.0f);
-            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBand(15), 0.03f, HighMax), 0.01f, HighMax, 1.0f, 4.0f);
+            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(4, 10), 0.03f, MidMax), 0.01f, MidMax, 0.5f, 6.0f);
+            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(10, 15), 0.03f, HighMax), 0.01f, HighMax, 1.0f, 4.0f);
             float UMult = 0.7f;
             
             gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
@@ -89,18 +93,18 @@ class LEDStrip{
             sNoise.SetScale(Vector3D(sShift, sShift, sShift));
             sNoise.SetZPosition(x * 4.0f);
 
-            this->currentBrightess = (uint8_t)Mathematics::Constrain((Rmult / 10.0f * MAX_BRIGHTNESS), this->MinBright, MAX_BRIGHTNESS);
+            if (rca.getBandAvg(0, 3) > 3) this->currentBrightess = (uint8_t)Mathematics::Constrain((Rmult / 10.0f * MAX_BRIGHTNESS), this->MinBright, MAX_BRIGHTNESS);
 
             //this->currentBrightess = (uint8_t)(-100.0f/ (currentBrightess - LowMax - 100.0f) - 0.909090909091f);
 
-            if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue / 2) && (rca.getBandAvg() > 120)){
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)((currentBrightess + 20)*Rmult/10), this->MinBright, MAX_BRIGHTNESS));
+            if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue / 2) && (rca.getBandAvg(0, 3) > 80)){
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)((currentBrightess + 60)*Rmult/10), this->MinBright, MAX_BRIGHTNESS));
 
-                if (millis() - prevmillis >= 300){
-                    gNoiseMat.HueShift(13);
-                    currentHue += 13;
+                if (millis() - prevmillis >= 600){
+                    gNoiseMat.HueShift(7);
+                    currentHue += 7;
                     if (currentHue >= 360.0f){
-                        currentHue -= 347.0f;
+                        currentHue -= 353.0f;
                     }
                 }
                 
@@ -109,13 +113,13 @@ class LEDStrip{
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
                     pixel.r = MAX_BRIGHTNESS;
-                    pixel.g = MAX_BRIGHTNESS - (uint8_t)(b * currentHue * 60 / 3600);
-                    pixel.b = MAX_BRIGHTNESS - (uint8_t)(b * currentHue * 60 / 3600);
+                    pixel.g = MAX_BRIGHTNESS - (uint8_t)(b * currentHue / 100);
+                    pixel.b = MAX_BRIGHTNESS - (uint8_t)(b * currentHue / 100);
                     led[num] = pixel;
                 }
             }        
-            else if( ((LowMax - lLow) > this->RunningAverageDiff * 2.5f) && ((LowMax - lLow) < this->RunningAverageDiff * 3.1f) && (rca.getBandAvg() > 60)){
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain(currentBrightess * 0.55f, this->MinBright, MAX_BRIGHTNESS));
+            else if( ((LowMax - lLow) > this->RunningAverageDiff * 2.5f) && ((LowMax - lLow) < this->RunningAverageDiff * 3.1f) && (rca.getBandAvg(0, 3) > 40)  && (rca.getBandAvg(0, 3) <= 80) ){
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain(MinBright + currentBrightess * 0.2f, this->MinBright, MAX_BRIGHTNESS));
 
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
@@ -127,25 +131,43 @@ class LEDStrip{
                 }
             }
             else{
-                FastLED.setBrightness((uint8_t)(Mathematics::Constrain(currentBrightess * 0.4f, this->MinBright, MAX_BRIGHTNESS)));
+                if (rca.getBandAvg(10,16) > 20 || rca.getBandAvg(0,3) > 5 || rca.getBandAvg(3,10) > 2) {
+                    FastLED.setBrightness((uint8_t)(Mathematics::Constrain(MinBright + currentBrightess * 0.1f, this->MinBright, MAX_BRIGHTNESS)));
+                }
+
+                if (FastLED.getBrightness() > MinBright) FastLED.setBrightness(FastLED.getBrightness()-1);
+
+                int sat = 0.8f;
+
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
                     RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
-                    if (lLow > 2){
-                        pixel.r = (uint8_t) Mathematics::Constrain((Mathematics::Map(Mathematics::Constrain(RunningAverageDiff, 0.03f, LowMax), 0.01f, LowMax, 0.3f, 10.0f) * refpixel.R * UMult), this->MinBright, 255);
+                    float gray = GrayScale(pixel.r, pixel.g, pixel.b, sat);
+
+                    if (rca.getBandAvg(0, 3) > 10){
+                        pixel.r = (uint8_t) Mathematics::Constrain(Rmult * refpixel.R * UMult, this->MinBright, 255);
                     }
-                    else pixel.r = (uint8_t) Mathematics::Constrain((x*UMult*refpixel.R), this->MinBright, 255);
-                    if (rca.getBand(7) > 2){
+                    else pixel.r = (uint8_t) Mathematics::Constrain((x*UMult*refpixel.R)*(1-sat) + gray, this->MinBright, 255);
+                    if (rca.getBandAvg(4, 10) > 10){
                         pixel.g = (uint8_t) Mathematics::Constrain((Gmult * (refpixel.G) * UMult), this->MinBright, 255);
                     }
-                    else pixel.g = (uint8_t) Mathematics::Constrain((y*UMult*refpixel.G), this->MinBright, 255);
-                    if (rca.getBand(15) > 15){
+                    else pixel.g = (uint8_t) Mathematics::Constrain((y*UMult*refpixel.G)*(1-sat) + gray, this->MinBright, 255);
+                    if (rca.getBandAvg(10, 16) > 15){
                         pixel.b = (uint8_t) Mathematics::Constrain((Bmult * (refpixel.B) * UMult), this->MinBright, 255);
                     }
-                    else pixel.b = (uint8_t) Mathematics::Constrain((z*UMult*refpixel.B), this->MinBright, 255);
+                    else pixel.b = (uint8_t) Mathematics::Constrain((z*UMult*refpixel.B)*(1-sat) + gray, this->MinBright, 255);
                     led[num] = pixel;
                 }
+
             }
+            Serial.print(rca.getBandAvg(0, 3));
+            Serial.print("\t\t");
+            Serial.print(rca.getBandAvg(3, 10));
+            Serial.print("\t\t");
+            Serial.print(rca.getBandAvg(10, 15));
+            Serial.print("\t\t");
+            Serial.println(FastLED.getBrightness());
+            
             
 /*
             Serial.print(Rmult);

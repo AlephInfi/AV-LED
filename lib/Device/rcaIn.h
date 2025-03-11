@@ -74,12 +74,13 @@ class RCA{
             return AvGainL * multiplier;
         }
 
-        float getBandAvg(){
+        int getBandAvg(int MinBins = 0, int MaxBins = BINS - 1){
+            if (MaxBins > BINS - 1) MaxBins = BINS - 1;
             int total;
-            for (int i = 0; i < BINS; i++){
+            for (int i = MinBins; i < MaxBins; i++){
                 total += bandValues[i];
             }
-            return (total / BINS);
+            return (int)(total / (MaxBins - MinBins));
         }
 
         int getMicrosDelay(){
