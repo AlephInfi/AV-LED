@@ -45,7 +45,6 @@ class LEDStrip{
         uint8_t MinBright = 0;
         int rafilter[50];
 
-        // do cool bpm effect with color switching
         SimplexNoise GenRandTwoColorSimplex(){
             RGBColor noiseSpectrum[2] = {RGBColor(255 - random8(120), 255 - random8(120), 255 - random8(120)), RGBColor(255 - random8(120), 255 - random8(120), 255 - random8(120))};
             GradientMaterial gNoiseMat = GradientMaterial(4, noiseSpectrum, 2.0f, false);
@@ -81,23 +80,23 @@ class LEDStrip{
             float z = 0.5f * sinf(ratio * 2 * 3.14159f + MultiplierRandZ*100) + 0.5f;
 
             float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
-            float sShift = linSweep * 0.001f + 0.002f;
+            float sShift = linSweep * 0.00075f + 0.0015f;
 
             float Rmult = Mathematics::Map(Mathematics::Constrain(lLow, 0.03f, LowMax), 0.01f, LowMax, 0.3f, 10.0f);
-            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(4, 10), 0.03f, MidMax), 0.01f, MidMax, 0.5f, 6.0f);
+            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(4, 10) - 1, 0.03f, MidMax), 0.01f, MidMax, 0.5f, 6.0f);
             float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(10, 15), 0.03f, HighMax), 0.01f, HighMax, 1.0f, 4.0f);
             float UMult = 0.7f;
             
             gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
             gNoiseMat.HueShift(currentHue + x * 360);
             sNoise.SetScale(Vector3D(sShift, sShift, sShift));
-            sNoise.SetZPosition(x * 4.0f);
+            sNoise.SetZPosition(x * 8.0f);
 
             if (rca.getBandAvg(0, 3) > 3) this->currentBrightess = (uint8_t)Mathematics::Constrain((Rmult / 10.0f * MAX_BRIGHTNESS), this->MinBright, MAX_BRIGHTNESS);
 
             //this->currentBrightess = (uint8_t)(-100.0f/ (currentBrightess - LowMax - 100.0f) - 0.909090909091f);
 
-            if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue / 2) && (rca.getBandAvg(0, 3) > 80)){
+            if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue / 2) && (rca.getBandAvg(0, 3) > 10)   && (rca.getBandAvg(0, 3) > LowMax*0.65f)){
                 FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)((currentBrightess + 60)*Rmult/10), this->MinBright, MAX_BRIGHTNESS));
 
                 if (millis() - prevmillis >= 600){
@@ -118,8 +117,8 @@ class LEDStrip{
                     led[num] = pixel;
                 }
             }        
-            else if( ((LowMax - lLow) > this->RunningAverageDiff * 2.5f) && ((LowMax - lLow) < this->RunningAverageDiff * 3.1f) && (rca.getBandAvg(0, 3) > 40)  && (rca.getBandAvg(0, 3) <= 80) ){
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain(MinBright + currentBrightess * 0.2f, this->MinBright, MAX_BRIGHTNESS));
+            else if( ((LowMax - lLow) > this->RunningAverageDiff * 2.5f) && ((LowMax - lLow) < this->RunningAverageDiff * 3.1f) && (rca.getBandAvg(0, 3) > 10)  && (rca.getBandAvg(0, 3) <= LowMax*0.65f) ){
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain(MinBright + currentBrightess*Rmult/11, this->MinBright, MAX_BRIGHTNESS));
 
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
@@ -132,7 +131,7 @@ class LEDStrip{
             }
             else{
                 if (rca.getBandAvg(10,16) > 20 || rca.getBandAvg(0,3) > 5 || rca.getBandAvg(3,10) > 2) {
-                    FastLED.setBrightness((uint8_t)(Mathematics::Constrain(MinBright + currentBrightess * 0.1f, this->MinBright, MAX_BRIGHTNESS)));
+                    FastLED.setBrightness((uint8_t)(Mathematics::Constrain(MinBright + currentBrightess*Rmult/12, this->MinBright, MAX_BRIGHTNESS)));
                 }
 
                 if (FastLED.getBrightness() > MinBright) FastLED.setBrightness(FastLED.getBrightness()-1);
@@ -145,17 +144,17 @@ class LEDStrip{
                     float gray = GrayScale(pixel.r, pixel.g, pixel.b, sat);
 
                     if (rca.getBandAvg(0, 3) > 10){
-                        pixel.r = (uint8_t) Mathematics::Constrain(Rmult * refpixel.R * UMult, this->MinBright, 255);
+                        pixel.r = (uint8_t) Mathematics::Constrain(Rmult * refpixel.R * UMult, 60, 255);
                     }
-                    else pixel.r = (uint8_t) Mathematics::Constrain((x*UMult*refpixel.R)*(1-sat) + gray, this->MinBright, 255);
+                    else pixel.r = (uint8_t) Mathematics::Constrain((x*UMult*refpixel.R)*(1-sat) + gray, 60, 255);
                     if (rca.getBandAvg(4, 10) > 10){
-                        pixel.g = (uint8_t) Mathematics::Constrain((Gmult * (refpixel.G) * UMult), this->MinBright, 255);
+                        pixel.g = (uint8_t) Mathematics::Constrain((Gmult * (refpixel.G) * UMult), 50, 255);
                     }
-                    else pixel.g = (uint8_t) Mathematics::Constrain((y*UMult*refpixel.G)*(1-sat) + gray, this->MinBright, 255);
+                    else pixel.g = (uint8_t) Mathematics::Constrain((y*UMult*refpixel.G)*(1-sat) + gray, 50, 255);
                     if (rca.getBandAvg(10, 16) > 15){
-                        pixel.b = (uint8_t) Mathematics::Constrain((Bmult * (refpixel.B) * UMult), this->MinBright, 255);
+                        pixel.b = (uint8_t) Mathematics::Constrain((Bmult * (refpixel.B) * UMult), 60, 255);
                     }
-                    else pixel.b = (uint8_t) Mathematics::Constrain((z*UMult*refpixel.B)*(1-sat) + gray, this->MinBright, 255);
+                    else pixel.b = (uint8_t) Mathematics::Constrain((z*UMult*refpixel.B)*(1-sat) + gray, 60, 255);
                     led[num] = pixel;
                 }
 
@@ -165,6 +164,8 @@ class LEDStrip{
             Serial.print(rca.getBandAvg(3, 10));
             Serial.print("\t\t");
             Serial.print(rca.getBandAvg(10, 15));
+            Serial.print("\t\t");
+            Serial.print(FastLED.getFPS());
             Serial.print("\t\t");
             Serial.println(FastLED.getBrightness());
             
@@ -256,9 +257,8 @@ class LEDStrip{
         void Update(int command, float ratio){
             rca.Sample();
             rca.FFT();
-            //bpmDetect.Update(rca); // Mem overflow?
-            //lLow = (rca.getBand(0) > rca.getBand(1)) ? rca.getBand(0) : rca.getBand(1);
-            lLow = rca.getBand(0);
+
+            lLow = rca.getBandAvg(0,3);
             if (ct >= 50) ct = 0;
 
             if(lLow > LowMax) LowMax = lLow;
