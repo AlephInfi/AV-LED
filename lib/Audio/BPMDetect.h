@@ -1,32 +1,41 @@
 #pragma once
 
-#include "..\Utilities\MiniBpm.h"
 #include "..\Utilities\Conversions.h"
 #include "..\Device\RCAIn.h"
+#include <stdint.h>
 
-#define SECS    5 //number of seconds to analyze
+class BeatDetector {
+public:
+    BeatDetector(float attack = 0.6f, float release = 0.1f, float sensitivity = 1.4f)
+        : attack(attack), release(release), sensitivity(sensitivity) {}
 
-class BPM{
-    private:
-        MiniBPM bpm = MiniBPM((float)SAMPLE_RATE);
-        double CurrentBPM = 140; //common BPM to start with
-        ClockMillis timer;
+    bool process(float input) {
+        // Envelope follower
+        if(input > envelope)
+            envelope += attack * (input - envelope);
+        else
+            envelope += release * (input - envelope);
 
-    public:
-        BPM(){};
+        // Adaptive threshold
+        float threshold = envelope * sensitivity;
 
-        void Update(RCA &rca){
-            bpm.process(rca.getAmpL(), (int)NUM_SAMPLES);
-            CurrentBPM = bpm.estimateTempo();
-            Serial.println("BPM Success!");
+        // Beat when input spikes above envelope
+        bool beatNow = (input > threshold);
+
+        // Debounce beats to avoid double triggers
+        if(beatNow && !wasHigh) {
+            wasHigh = true;
+            return true;
         }
+        if(!beatNow)
+            wasHigh = false;
 
-        void SetRange(double lowerLim = 55.0f, double upperLim = 180.0f){
-            bpm.setBPMRange(lowerLim, upperLim);
-        }
+        return false;
+    }
 
-        //return bpm estimate
-        double GetBPM(){
-            return CurrentBPM;
-        }
+private:
+    float envelope = 0.0f;
+    float attack, release;
+    float sensitivity;
+    bool wasHigh = false;
 };
