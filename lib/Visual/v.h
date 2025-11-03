@@ -12,7 +12,7 @@
 #define LEDPIN          14
 #define NUM_LEDS        600
 
-#define MAX_BRIGHTNESS    190 //Maximum brightness
+#define MAX_BRIGHTNESS    160 //Maximum brightness
 
 class LEDStrip{
     private:
@@ -25,6 +25,7 @@ class LEDStrip{
         BeatDetector bpm;
 
         RGBColor noiseSpectrum[3] = {RGBColor(0, 0, 255), RGBColor(255, 0, 0), RGBColor(0, 255, 0)};
+        //RGBColor noiseSpectrum[3] = {RGBColor(0, 0, 0), RGBColor(0, 0, 0), RGBColor(0, 0, 0)};
         GradientMaterial gNoiseMat = GradientMaterial(3, noiseSpectrum, 2.0f, false);
         SimplexNoise sNoise = SimplexNoise(random16(), &gNoiseMat);
         float currentHue = 0.0f;
@@ -46,9 +47,12 @@ class LEDStrip{
         int RunningAverageDiff;
         uint8_t MinBright = 0;
         int rafilter[50];
+        
+        CRGB trans_white_pixel = CRGB(150, 150, 150);
 
         SimplexNoise GenRandTwoColorSimplex(){
             RGBColor noiseSpectrum[2] = {RGBColor(255 - random8(120), 255 - random8(120), 255 - random8(120)), RGBColor(255 - random8(120), 255 - random8(120), 255 - random8(120))};
+            //RGBColor noiseSpectrum[2] = {RGBColor(0, 0, 0), RGBColor(0, 0, 0)};
             GradientMaterial gNoiseMat = GradientMaterial(4, noiseSpectrum, 2.0f, false);
             SimplexNoise sNoise = SimplexNoise(1, &gNoiseMat);
             return sNoise;
@@ -56,6 +60,79 @@ class LEDStrip{
 
         float GrayScale(float R, float G, float B, float saturation){
             return saturation * (R + G + B)/3 - currentBrightess*60/255;
+        }
+
+        struct Pulse {
+            CRGB color;
+            float length;   // tail length in LEDs
+            uint32_t startTime;
+            uint32_t duration;   // ms to travel full strip  
+        };
+
+        static const uint8_t MAX_PULSES = 20;
+        uint32_t pulseTimeoutDuration;
+        Pulse pulses[MAX_PULSES];
+        uint8_t pulseCount = 0;
+
+        void RenderPulses() {
+            uint32_t now = millis();
+
+            for (uint8_t i = 0; i < pulseCount; i++) {
+                Pulse &p = pulses[i];
+
+                // progress from 0.0 → 1.0
+                float progress = (float)(now - p.startTime) / (float)p.duration;
+
+                if (progress >= 1.0f) {
+                    // Pulse finished → remove it
+                    for (uint8_t j = i; j < pulseCount - 1; j++) pulses[j] = pulses[j+1];
+                    pulseCount--;
+                    i--;
+                    continue;
+                }
+
+                float headPos = progress * (NUM_LEDS - 1);
+
+                // Draw from head backward toward tail
+                // Draw from head back to tail
+                for (int ledIndex = (int)headPos; ledIndex >= (int)(headPos - p.length) && ledIndex >= 0; ledIndex--) {
+
+                    float d = (headPos - ledIndex) / p.length;
+                    d = Mathematics::Constrain(d, 0.0f, 1.0f);
+
+                    // Exponential shaping
+                    const float headSharpness = 4.0f; // how hot the head is
+                    const float tailFalloff   = 3.5f; // how fast tail fades
+
+                    float intensity = expf(-tailFalloff * d);
+                    float colorBoost = expf(-headSharpness * d);
+
+                    intensity *= (1.0f + 0.5f * colorBoost);
+                    intensity = Mathematics::Constrain(intensity, 0.0f, 1.0f);
+
+                    CRGB faded = CRGB(
+                        p.color.r * intensity,
+                        p.color.g * intensity,
+                        p.color.b * intensity
+                    );
+
+                    led[ledIndex].r = Mathematics::Constrain((unsigned int)led[ledIndex].r + faded.r, 0, 255);
+                    led[ledIndex].g = Mathematics::Constrain((unsigned int)led[ledIndex].g + faded.g, 0, 255);
+                    led[ledIndex].b = Mathematics::Constrain((unsigned int)led[ledIndex].b + faded.b, 0, 255);
+                }
+
+            }
+        }
+
+        void StartPulse(CRGB color, float length, uint32_t t_ms, uint16_t timeSince = 300) {
+            if (pulseCount >= MAX_PULSES) return; // no room, ignore
+
+            pulseTimeoutDuration = (length / NUM_LEDS) * t_ms;
+            pulses[pulseCount].color = color;
+            pulses[pulseCount].length = Mathematics::Constrain(length * timeSince / 500, 30.0f, 70.0f);
+            pulses[pulseCount].startTime = millis();
+            pulses[pulseCount].duration = Mathematics::Constrain(t_ms * timeSince / 500, 1300.0f, 4000.0f);
+            pulseCount++;
         }
 
         void Simplex(float ratio){
@@ -81,7 +158,7 @@ class LEDStrip{
             {
                 // Smoothing factor between 0.0 and 1.0  
                 // Lower = smoother (slower changes), Higher = faster response
-                const float smoothFactor = 0.8f;  
+                const float smoothFactor = 0.6f;  
 
                 CRGB oldPix = prevLed[num];
 
@@ -96,29 +173,41 @@ class LEDStrip{
                 // Store current value for next frame
                 prevLed[num] = pixel;
             };
+            
+            static unsigned long prevT = millis();
+
+            float Rmult = Mathematics::Map(Mathematics::Constrain(lLow, 0.03f, LowMax), 0.01f, LowMax, 0.3f, 10.0f);
+            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(4, 10) - 1, 0.03f, MidMax), 0.01f, MidMax, 0.5f, 6.0f);
+            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(10, 15), 0.03f, HighMax), 0.01f, HighMax, 1.0f, 4.0f);
+            float UMult = 0.7f;
 
             if (IdleState) {
-            float x = 0.5f * sinf(ratio * 2 * 3.14159f) + 0.5f;
+                float x = 0.5f * sinf(ratio * 2 * 3.14159f) + 0.5f;
+                float y = 0.5f * sinf(ratio * 4 * 3.14159f + MultiplierRandY*50) + 0.5f;
+                float z = 0.5f * sinf(ratio * 2 * 3.14159f + MultiplierRandZ*100) + 0.5f;
 
-            float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
-            float sShift = linSweep * 0.00075f + 0.0015f;
-            
-            gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
-            gNoiseMat.HueShift(currentHue + x * 360);
-            sNoise.SetScale(Vector3D(sShift, sShift, sShift));
-            sNoise.SetZPosition(x * 8.0f);
-            const float idleBrightSmooth = 0.08f;
-            uint8_t smoothed = prevBrightness + (MinBright - prevBrightness) * idleBrightSmooth;
-            FastLED.setBrightness(smoothed);
-            prevBrightness = smoothed;
+                float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
+                float sShift = linSweep * 0.001f;
+                
+                gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
+                gNoiseMat.HueShift(currentHue + x * 180);
+                sNoise.SetScale(Vector3D(sShift, sShift, sShift));
+                sNoise.SetZPosition(x * 8.0f);
+                FastLED.setBrightness(MinBright);
 
-            for(int num = 0; num < NUM_LEDS; num++){
-                CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
-                pixel.nscale8_video(65); // keep soft & not eye-searing
-                led[num] = pixel;
-                prevLed[num] = pixel;
-            }
-            return;
+                int sat = 0.8f;
+
+                for(int num = 0; num < NUM_LEDS; num++){
+                    CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 1.0f);
+                        RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
+                        float gray = GrayScale(pixel.r, pixel.g, pixel.b, sat);
+                        pixel.r = (uint8_t) Mathematics::Constrain((x*UMult*refpixel.R)*(1-sat) + gray, 60, 255);
+                        pixel.g = (uint8_t) Mathematics::Constrain((y*UMult*refpixel.G)*(1-sat) + gray, 50, 255);
+                        pixel.b = (uint8_t) Mathematics::Constrain((z*UMult*refpixel.B)*(1-sat) + gray, 60, 255);
+                    led[num] = pixel;
+                    prevLed[num] = pixel;
+                }
+                return;
             }
             
             float x = 0.5f * sinf(ratio * 2 * 3.14159f) + 0.5f;
@@ -127,11 +216,6 @@ class LEDStrip{
 
             float linSweep = ratio > 0.5f ? 1.0f - ratio : ratio;
             float sShift = linSweep * 0.00075f + 0.0015f;
-
-            float Rmult = Mathematics::Map(Mathematics::Constrain(lLow, 0.03f, LowMax), 0.01f, LowMax, 0.3f, 10.0f);
-            float Gmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(4, 10) - 1, 0.03f, MidMax), 0.01f, MidMax, 0.5f, 6.0f);
-            float Bmult = Mathematics::Map(Mathematics::Constrain(rca.getBandAvg(10, 15), 0.03f, HighMax), 0.01f, HighMax, 1.0f, 4.0f);
-            float UMult = 0.7f;
             
             gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
             gNoiseMat.HueShift(currentHue + x * 360);
@@ -140,44 +224,37 @@ class LEDStrip{
 
             if (rca.getBandAvg(0, 3) > 3) this->currentBrightess = (uint8_t)Mathematics::Constrain((Rmult / 10.0f * MAX_BRIGHTNESS), this->MinBright, MAX_BRIGHTNESS);
 
-            //this->currentBrightess = (uint8_t)(-100.0f/ (currentBrightess - LowMax - 100.0f) - 0.909090909091f);
-
             if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue / 2) && (rca.getBandAvg(0, 3) > 10)   && (rca.getBandAvg(0, 3) > LowMax*0.65f)){
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)((currentBrightess + 60)*Rmult/10), this->MinBright, MAX_BRIGHTNESS));
-
-                if (millis() - prevmillis >= 600){
-                    gNoiseMat.HueShift(7);
-                    currentHue += 7;
-                    if (currentHue >= 360.0f){
-                        currentHue -= 353.0f;
-                    }
-                }
-                
-                int b = random(50, 100);
-
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)((currentBrightess + 60)*Rmult), this->MinBright, MAX_BRIGHTNESS));
                 for(int num = 0; num < NUM_LEDS; num++){
-                    CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
-                    pixel.r = MAX_BRIGHTNESS;
-                    pixel.g = MAX_BRIGHTNESS - (uint8_t)(b * currentHue / 100);
-                    pixel.b = MAX_BRIGHTNESS - (uint8_t)(b * currentHue / 100);
+                    CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.2f);
+                    RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
+                    pixel.r = (uint8_t) Mathematics::Constrain((Rmult * refpixel.R * UMult), 0, MAX_BRIGHTNESS / 4);
+                    pixel.g = (uint8_t) Mathematics::Constrain((Gmult * refpixel.G * UMult), 0, MAX_BRIGHTNESS / 4);
+                    pixel.b = (uint8_t) Mathematics::Constrain((Bmult * refpixel.B * UMult), 0, MAX_BRIGHTNESS / 4);
                     smoothing(num, pixel);
+                }
+                long now = millis();
+                if (now - prevT >= pulseTimeoutDuration){
+                    StartPulse(trans_white_pixel, 60, 2100, now-prevT);
+                    prevT = millis();
                 }
             }        
             else if( ((LowMax - lLow) > this->RunningAverageDiff * 2.5f) && ((LowMax - lLow) < this->RunningAverageDiff * 3.1f) && (rca.getBandAvg(0, 3) > 10)  && (rca.getBandAvg(0, 3) <= LowMax*0.65f) ){
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain(MinBright + currentBrightess*Rmult/11, this->MinBright, MAX_BRIGHTNESS));
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain(MinBright + currentBrightess*Rmult/15, this->MinBright, MAX_BRIGHTNESS / 2));
 
                 for(int num = 0; num < NUM_LEDS; num++){
-                    CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.1f);
+                    CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.2f);
                     RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
-                    pixel.r = (uint8_t) Mathematics::Constrain((Rmult * refpixel.R * UMult), 0, 255);
-                    pixel.g = (uint8_t) Mathematics::Constrain((Gmult * refpixel.G * UMult), 0, 255);
-                    pixel.b = (uint8_t) Mathematics::Constrain((Bmult * refpixel.B * UMult), 0, 255);
+                    pixel.r = (uint8_t) Mathematics::Constrain((Rmult * refpixel.R * UMult), 0, MAX_BRIGHTNESS / 5);
+                    pixel.g = (uint8_t) Mathematics::Constrain((Gmult * refpixel.G * UMult), 0, MAX_BRIGHTNESS / 5);
+                    pixel.b = (uint8_t) Mathematics::Constrain((Bmult * refpixel.B * UMult), 0, MAX_BRIGHTNESS / 5);
                     smoothing(num, pixel);
                 }
             }
             else{
                 if (rca.getBandAvg(10,16) > 20 || rca.getBandAvg(0,3) > 5 || rca.getBandAvg(3,10) > 2) {
-                    FastLED.setBrightness((uint8_t)(Mathematics::Constrain(MinBright + currentBrightess*Rmult/12, this->MinBright, MAX_BRIGHTNESS)));
+                    FastLED.setBrightness((uint8_t)(Mathematics::Constrain(MinBright + currentBrightess*Rmult/20, this->MinBright, MAX_BRIGHTNESS / 3)));
                 }
 
                 if (FastLED.getBrightness() > MinBright) FastLED.setBrightness(FastLED.getBrightness()-1);
@@ -190,98 +267,23 @@ class LEDStrip{
                     float gray = GrayScale(pixel.r, pixel.g, pixel.b, sat);
 
                     if (rca.getBandAvg(0, 3) > 10){
-                        pixel.r = (uint8_t) Mathematics::Constrain(Rmult * refpixel.R * UMult, 60, 255);
+                        pixel.r = (uint8_t) Mathematics::Constrain(Rmult * refpixel.R * UMult, 60, MAX_BRIGHTNESS / 6);
                     }
-                    else pixel.r = (uint8_t) Mathematics::Constrain((x*UMult*refpixel.R)*(1-sat) + gray, 60, 255);
+                    else pixel.r = (uint8_t) Mathematics::Constrain((x*UMult*refpixel.R)*(1-sat) + gray, 60, MAX_BRIGHTNESS / 6);
                     if (rca.getBandAvg(4, 10) > 10){
-                        pixel.g = (uint8_t) Mathematics::Constrain((Gmult * (refpixel.G) * UMult), 50, 255);
+                        pixel.g = (uint8_t) Mathematics::Constrain((Gmult * (refpixel.G) * UMult), 50, MAX_BRIGHTNESS / 6);
                     }
-                    else pixel.g = (uint8_t) Mathematics::Constrain((y*UMult*refpixel.G)*(1-sat) + gray, 50, 255);
+                    else pixel.g = (uint8_t) Mathematics::Constrain((y*UMult*refpixel.G)*(1-sat) + gray, 50, MAX_BRIGHTNESS / 6);
                     if (rca.getBandAvg(10, 16) > 15){
-                        pixel.b = (uint8_t) Mathematics::Constrain((Bmult * (refpixel.B) * UMult), 60, 255);
+                        pixel.b = (uint8_t) Mathematics::Constrain((Bmult * (refpixel.B) * UMult), 60, MAX_BRIGHTNESS / 6);
                     }
-                    else pixel.b = (uint8_t) Mathematics::Constrain((z*UMult*refpixel.B)*(1-sat) + gray, 60, 255);
+                    else pixel.b = (uint8_t) Mathematics::Constrain((z*UMult*refpixel.B)*(1-sat) + gray, 60, MAX_BRIGHTNESS / 6);
                     smoothing(num, pixel);
                 }
 
             }
         }
-
-        void AudioPulse(float audioLevel) {
-            // ----- STATE (persists automatically) -----
-            struct Pulse {
-                float pos;
-                float speed;
-                float width;
-                CHSV color;
-                bool active;
-            };
-            static const uint8_t MAX_PULSES = 8;
-            static Pulse pulses[MAX_PULSES];
-
-            // Beat envelope state
-            static float envelope = 0.0f;
-            static bool beatHeld = false;
-
-            // Tunable beat detector sensitivity
-            const float attack = 0.70f;
-            const float release = 0.12f;
-            const float sensitivity = 1.45f;
-
-            // ----- BEAT DETECTION -----
-            if (audioLevel > envelope)
-                envelope += attack * (audioLevel - envelope);
-            else
-                envelope += release * (audioLevel - envelope);
-
-            float threshold = envelope * sensitivity;
-            bool beatNow = (audioLevel > threshold);
-            bool beat = (beatNow && !beatHeld);
-            beatHeld = beatNow;
-
-            // ----- SPAWN PULSE ON BEAT (Left → Right) -----
-            if (beat) {
-                for (uint8_t i = 0; i < MAX_PULSES; i++) {
-                    if (!pulses[i].active) {
-                        pulses[i].pos = 0.0f;        // Start at left (pixel 0)
-                        pulses[i].speed = 0.65f;     // Try 0.45 - 1.2 for different feels
-                        pulses[i].width = 6.0f;      // Spread / bloom size
-                        pulses[i].color = CHSV(random8(), 255, 255);
-                        pulses[i].active = true;
-                        break;
-                    }
-                }
-            }
-
-            // ----- CLEAR STRIP (no background; pulses only) -----
-            for (int i = 0; i < NUM_LEDS; i++)
-                led[i] = CRGB::Black;
-
-            // ----- UPDATE + DRAW PULSES -----
-            for (uint8_t i = 0; i < MAX_PULSES; i++) {
-                if (!pulses[i].active) continue;
-
-                pulses[i].pos += pulses[i].speed;
-
-                // If pulse has moved off strip → remove
-                if (pulses[i].pos - pulses[i].width > (float)NUM_LEDS) {
-                    pulses[i].active = false;
-                    continue;
-                }
-
-                // Paint pulse area
-                for (int px = 0; px < NUM_LEDS; px++) {
-                    float d = fabsf(px - pulses[i].pos) / pulses[i].width;
-                    if (d > 1.0f) continue;
-
-                    float intensity = 1.0f - d;  // linear falloff
-                    led[px] += pulses[i].color % (uint8_t)(intensity * 255);
-                }
-            }
-
-            FastLED.show();
-        }
-
+        
     public:
         LEDStrip(){}
 
@@ -307,40 +309,38 @@ class LEDStrip{
 
         void Update(int command, float ratio){
             auto smoothBright = [&] (){
-                // --- PUNCHY BRIGHTNESS ENVELOPE (Club Mode) --- //
-                float bass = Mathematics::Constrain(rca.getBandAvg(0,3), 0.0f, LowMax);
+                // Smoothing + Amplification
+                const float brightSmooth = 0.3f;  // strong pumping feel (adjust as desired)
 
-                // Normalize bass energy to 0–1
-                float bassNorm = bass / (LowMax + 0.0001f);
-                bassNorm = powf(bassNorm, 0.55f);   // nonlinear → stronger accent on peaks
+                // Get the brightness your audio logic produced this frame
+                uint8_t target = FastLED.getBrightness();
 
-                // Map to desired brightness range
-                uint8_t targetBrightness = MinBright + bassNorm * (MAX_BRIGHTNESS - MinBright);
+                // --- Smooth toward target ---
+                float smoothed = prevBrightness + (target - prevBrightness) * brightSmooth;
 
-                // Fast attack, slower release
-                float attack = 0.85f;   // faster = more punch
-                float release = 0.18f;  // slower fade = breathing effect
+                // --- Normalize & Amplify Full Range ---
+                float normalized = (smoothed - MinBright) / (float)(MAX_BRIGHTNESS - MinBright);
+                normalized = Mathematics::Constrain(normalized, 0.0f, 1.0f);
 
-                float smoothing = (targetBrightness > prevBrightness) ? attack : release;
+                // Remap back to full usable brightness span
+                uint8_t amplifiedBrightness = (uint8_t)(MinBright + normalized * (MAX_BRIGHTNESS - MinBright));
 
-                uint8_t smoothedBrightness = prevBrightness + (targetBrightness - prevBrightness) * smoothing;
-
-                FastLED.setBrightness(smoothedBrightness);
-                prevBrightness = smoothedBrightness;
+                // Apply and store for next frame
+                FastLED.setBrightness(amplifiedBrightness);
+                prevBrightness = amplifiedBrightness;
             };
 
             rca.Sample();
             rca.FFT();
 
             float low  = rca.getBandAvg(0,3);
-            float mid  = rca.getBandAvg(4,10);
             float high = rca.getBandAvg(10,16);
 
             static bool noAudio = false;
             static uint32_t silenceTimer = 0;
 
             // If all bands are consistently below noise floor → silence
-            if (low < 5.0f && mid < 5.0f && high < 20.0f) {
+            if (low < 10.0f && high < 20.0f) {
                 if (millis() - silenceTimer > 120) noAudio = true;
             } else {
                 silenceTimer = millis();
@@ -379,10 +379,9 @@ class LEDStrip{
             switch(command){
                 case 0: Simplex(ratio);
                 case 1: SimplexWithAudioMod(ratio, noAudio);
-                //case 2: AudioPulse(rca.getBandAvg(0, 3));
             }
 
-
+            RenderPulses();
             smoothBright();
             FastLED.show();
         }

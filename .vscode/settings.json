@@ -8,5 +8,8 @@
         "*.tpp": "cpp",
         "ratio": "cpp",
         "random": "cpp"
-    }
+    },
+    "stm32-for-vscode.openOCDPath": false,
+    "stm32-for-vscode.makePath": false,
+    "stm32-for-vscode.armToolchainPath": false
 }
