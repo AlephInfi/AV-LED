@@ -428,11 +428,12 @@ class LEDStrip{
             sNoise.SetZPosition(x * 8.0f);
 
             long now = millis();
-            if (detectBeats().snare && now-prevsnr > 500){
+            BeatEvent ev = detectBeats();
+            if (ev.snare && now-prevsnr > 500){
                 StartBrightnessPulse(1.0f, 0.7f);
                 prevsnr = millis();
             }
-            if (detectBeats().kick && now-prevkick > 30){
+            if (ev.kick && now-prevkick > 30){
                 StartPulse(trans_white_pixel, 60, 1050, now-prevkick);
                 prevkick = millis();
             }
