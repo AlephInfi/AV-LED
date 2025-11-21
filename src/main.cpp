@@ -4,9 +4,9 @@ LEDStrip strip;
 
 void setup(){
   Serial.begin(115200);
-  delay(1000);
+  while (!Serial) {;}
 
-  strip.Init(20);
+  strip.Init(30);
 }
 
 void loop(){
