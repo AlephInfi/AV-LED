@@ -35,7 +35,7 @@ class RCA{
         void Sample(){
             AvGainL = 0;
             for(int i = 0; i < NUM_SAMPLES; i++){
-                vRealL[i] = analogRead(LEFT_PIN) / 200.0f;
+                vRealL[i] = analogRead(LEFT_PIN) / 20.0f;
                 vImagL[i] = 0;
                 AvGainL += vRealL[i];
 
@@ -84,12 +84,22 @@ class RCA{
                 else                 bandValues[15] += (int)vRealL[i];
             }
 
+            // boosting lows for punchier kicks
+            bandValues[0] *= 10;
+            bandValues[1] *= 10;
+            bandValues[2] *= 10;
+            bandValues[3] *= 9;
+            bandValues[4] *= 6;
+            bandValues[5] *= 2;
+
             for (byte band = 0; band < BINS; band++) {
                 int barHeight = bandValues[band] / SENSITIVITY;
                 barHeight = ((oldBarHeights[band] * 1) + barHeight) / 2;
                 if (barHeight > peak[band]) peak[band] = barHeight;
                 oldBarHeights[band] = barHeight;
             }
+
+
         }
 
         int getBand(int band){ return bandValues[band]; }

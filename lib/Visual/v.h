@@ -105,7 +105,7 @@ class LEDStrip{
             static const float SMOOTH_MID   = 0.92f;
             static const float SMOOTH_HIGH  = 0.93f;
 
-            static const float THRESH_LOW   = 1.25f;
+            static const float THRESH_LOW   = 1.20f;
             static const float THRESH_TRANS = 1.05f;   // transient (mid/high) for kick
             static const float THRESH_SNARE = 1.0f;
             static const float THRESH_HIHAT = 1.1f;
@@ -120,14 +120,14 @@ class LEDStrip{
             static bool initialized = false;
 
             if (!initialized) {
-                avgLow  = rca.getBandAvg(0, 3);    // 30–120 Hz  → bass
+                avgLow  = rca.getBandAvg(0, 3) * rca.getBandAvg(0, 3);    // 30–120 Hz  → bass
                 avgMid  = rca.getBandAvg(4, 10);    // 200–800 Hz → snare body
                 avgHigh = rca.getBandAvg(11, 15);  // 2–6 kHz    → hi-hat/transients
                 initialized = true;
             }
 
             // --- Read current energies ---
-            float lowNow  = rca.getBandAvg(0, 3);
+            float lowNow  = rca.getBandAvg(0, 3) * rca.getBandAvg(0, 3);
             float midNow  = rca.getBandAvg(3, 8);
             float highNow = rca.getBandAvg(8, 15);
 
@@ -433,7 +433,7 @@ class LEDStrip{
                 StartBrightnessPulse(1.0f, 0.7f);
                 prevsnr = millis();
             }
-            if (ev.kick && now-prevkick > 30){
+            if (ev.kick && now-prevkick > 30 && lLow > HighestLowValue * 0.7f){
                 StartPulse(trans_white_pixel, 60, 1050, now-prevkick);
                 prevkick = millis();
             }
@@ -549,7 +549,7 @@ class LEDStrip{
             static uint32_t silenceTimer = 0;
 
             // If all bands are consistently below noise floor → silence
-            if (low < 10.0f && high < 20.0f) {
+            if (low < 50 && high < 400) {
                 if (millis() - silenceTimer > 120) noAudio = true;
             } else {
                 silenceTimer = millis();
