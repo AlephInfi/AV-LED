@@ -12,7 +12,7 @@
 #define LEDPIN          14
 #define NUM_LEDS        600
 
-#define DEBUG
+//#define DEBUG
 
 #define MAX_BRIGHTNESS    255 //Maximum brightness
 

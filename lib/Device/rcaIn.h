@@ -85,7 +85,7 @@ class RCA{
             }
 
             // boosting lows for punchier kicks
-            bandValues[0] *= 10;
+            bandValues[0] *= 13;
             bandValues[1] *= 10;
             bandValues[2] *= 10;
             bandValues[3] *= 9;
