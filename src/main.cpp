@@ -3,9 +3,11 @@
 LEDStrip strip;
 
 void setup(){
-  //Serial.begin(115200);
-  //while (!Serial) {;}
-
+  #ifdef DEBUG
+  Serial.begin(115200);
+  while (!Serial) {;}
+  #endif
+  
   strip.Init(30);
 }
 
