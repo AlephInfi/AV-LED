@@ -7,11 +7,11 @@ void setup(){
   Serial.begin(115200);
   while (!Serial) {;}
   #endif
-  
-  strip.Init(30);
+
+  strip.Init(27);
 }
 
 void loop(){
-  float ratio = (float)(millis() % 10000) / 10000.0f;
+  float ratio = (float)(millis() % 15000) / 15000.0f;
   strip.Update(1, ratio);
 }
