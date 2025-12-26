@@ -8,7 +8,7 @@ void setup(){
   while (!Serial) {;}
   #endif
 
-  strip.Init(27);
+  strip.Init(30);
 }
 
 void loop(){

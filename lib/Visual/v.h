@@ -10,11 +10,11 @@
 */
 #define LED_VOLTS       5
 #define LEDPIN          14
-#define NUM_LEDS        600
+#define NUM_LEDS        730
 
 //#define DEBUG
 
-#define MAX_BRIGHTNESS    255 //Maximum brightness
+#define MAX_BRIGHTNESS    200 //Maximum brightness
 
 class LEDStrip{
     private:
@@ -106,11 +106,11 @@ class LEDStrip{
 
         BeatEvent detectBeats() {
             // --- Tunable parameters ---
-            static const float SMOOTH_LOW   = 0.90f;
+            static const float SMOOTH_LOW   = 0.9f;
             static const float SMOOTH_MID   = 0.92f;
             static const float SMOOTH_HIGH  = 0.93f;
 
-            static const float THRESH_LOW   = 1.15f;
+            static const float THRESH_LOW   = 1.00f;
             static const float THRESH_TRANS = 1.00f;   // transient (mid/high) for kick
             static const float THRESH_SNARE = 1.0f;
             static const float THRESH_HIHAT = 1.1f;
@@ -454,7 +454,7 @@ class LEDStrip{
                     prevkick = millis();
                 }
 
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)(currentBrightness*Rmult + MinBright), this->MinBright, MAX_BRIGHTNESS));
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)(currentBrightness*Rmult + MinBright), this->MinBright, 2*MAX_BRIGHTNESS/3));
 
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.2f);
@@ -541,7 +541,7 @@ class LEDStrip{
             static int silCt = 0;
             auto smoothBright = [&] (){
                 // Smoothing + Amplification
-                const float brightSmooth = 0.3f;  // strong pumping feel (adjust as desired)
+                const float brightSmooth = 0.4f;  // strong pumping feel (adjust as desired)
 
                 // Get the brightness your audio logic produced this frame
                 uint8_t target = FastLED.getBrightness();
