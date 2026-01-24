@@ -10,7 +10,7 @@
 */
 #define LED_VOLTS       5
 #define LEDPIN          14
-#define NUM_LEDS        600
+#define NUM_LEDS        780
 
 #define MAX_BRIGHTNESS    200 //Maximum brightness
 
@@ -105,7 +105,7 @@ class LEDStrip{
             static const float SMOOTH_MID   = 0.92f;
             static const float SMOOTH_HIGH  = 0.93f;
 
-            static const float THRESH_LOW   = 1.20f;
+            static const float THRESH_LOW   = 1.10f;
             static const float THRESH_TRANS = 1.05f;   // transient (mid/high) for kick
             static const float THRESH_SNARE = 1.0f;
             static const float THRESH_HIHAT = 1.1f;
@@ -545,14 +545,13 @@ class LEDStrip{
             float low  = rca.getBandAvg(0,3);
             float high = rca.getBandAvg(10,16);
 
+            // Init silence stuff here
             static bool noAudio = false;
             static uint32_t silenceTimer = 0;
-
-            // If all bands are consistently below noise floor → silence
-            if (low < 50 && high < 400) {
-                if (millis() - silenceTimer > 120) noAudio = true;
+            // If all bands are consistently below noise floor → silence for next frame
+            if (low < 60 && high < 500) {
+                if (millis() - silenceTimer > 60) noAudio = true;
             } else {
-                silenceTimer = millis();
                 noAudio = false;
             }
 
@@ -592,16 +591,29 @@ class LEDStrip{
             
             RenderPulses(2);
             smoothBright();
-            // 2. Each frame, get the boost
-            float boost = UpdateBrightnessPulse(); // 0–1
 
-            // 3. Add it to your rendered brightness
-            uint8_t base = FastLED.getBrightness();
-            uint8_t added = base + (uint8_t)(boost * MAX_BRIGHTNESS); // boost amount
-            if (added > MAX_BRIGHTNESS) added = MAX_BRIGHTNESS;
-            if (added < MinBright) added = MinBright;
+            static uint32_t timer = millis();
+            static int ctt = 1;
+            if (!noAudio){
+                // 2. Each frame, get the boost
+                float boost = UpdateBrightnessPulse(); // 0–1
 
-            FastLED.setBrightness(added);
+                // 3. Add it to your rendered brightness
+                uint8_t base = FastLED.getBrightness();
+                uint8_t added = base + (uint8_t)(boost * MAX_BRIGHTNESS); // boost amount
+                if (added > MAX_BRIGHTNESS) added = MAX_BRIGHTNESS;
+                if (added < MinBright) added = MinBright;
+                FastLED.setBrightness(added);
+                ctt = 1;
+            }
+            else if (noAudio){
+                if (millis() - timer > 4000){
+                    FastLED.setBrightness(FastLED.getBrightness() <= 5 ? 5 : MinBright - ctt);
+                    timer = millis();
+                    ctt++;
+                }
+            }
+            
             FastLED.show();
         }
 };
