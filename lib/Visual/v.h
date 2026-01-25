@@ -128,14 +128,14 @@ class LEDStrip{
             if (!initialized) {
                 avgLow  = rca.getBandAvg(0, 2) * rca.getBandAvg(0, 1) * 0.7f;    // 30–120 Hz  → bass
                 avgMid  = rca.getBandAvg(3, 6);    // 200–800 Hz → snare body
-                avgHigh = rca.getBandAvg(7, 15);  // 2–6 kHz    → hi-hat/transients
+                avgHigh = rca.getBandAvg(6, 15) * rca.getBandAvg(6, 15);
                 initialized = true;
             }
 
             // --- Read current energies ---
             float lowNow  = rca.getBandAvg(0, 2) * rca.getBandAvg(0, 1) * 0.7f;
             float midNow  = rca.getBandAvg(3, 6);
-            float highNow = rca.getBandAvg(7, 15);
+            float highNow = rca.getBandAvg(6, 15) * rca.getBandAvg(6, 15);
 
             // --- Exponential moving averages ---
             avgLow  = SMOOTH_LOW  * avgLow  + (1.0f - SMOOTH_LOW)  * lowNow;
@@ -171,12 +171,12 @@ class LEDStrip{
             // ===================================================
             // ✨ Hi-hat (high-frequency transient)
             // ===================================================
-            float highThresh = avgHigh * THRESH_HIHAT;
-            if (highNow > highThresh && now - lastHihat > COOLDOWN_HIHAT) {
+            float hThresh  = avgHigh  * THRESH_HIHAT;
+
+            if (highNow > hThresh && now - lastHihat > COOLDOWN_KICK) {
                 e.hihat = true;
                 lastHihat = now;
             }
-
             return e;
         }
 
@@ -367,7 +367,7 @@ class LEDStrip{
             {
                 // Smoothing factor between 0.0 and 1.0  
                 // Lower = smoother (slower changes), Higher = faster response
-                const float smoothFactor = 0.3f;  
+                const float smoothFactor = 0.5f;  
 
                 CRGB oldPix = prevLed[num];
 
@@ -443,7 +443,7 @@ class LEDStrip{
                 HighestMidValue *= 0.5f;
                 HighestHighValue *= 0.5f;
             }
-            if (ev.kick && now-prevkick > 30 && lLow > LowMax*0.4f){
+            if (ev.hihat && now-prevkick > 30 && lLow > LowMax*0.4f){ // hihat for hardstyle transients
                 StartPulse(trans_white_pixel, 60, 1050, now-prevkick);
                 StartBrightnessPulse(-0.5f, 0.4f);
                 prevkick = millis();
@@ -451,34 +451,29 @@ class LEDStrip{
             }
             
             if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue * 0.6f) && (lLow > LowMax*0.50f)){
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)(currentBrightness*Rmult + MinBright), this->MinBright, MAX_BRIGHTNESS));
+                float bassScale = (uint8_t) Mathematics::Constrain((float)(currentBrightness*Rmult + MinBright), this->MinBright, MAX_BRIGHTNESS * 0.7f);
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain((bassScale * bassScale) / (MAX_BRIGHTNESS*0.4f), 0, MAX_BRIGHTNESS));
 
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.2f);
                     RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
-                    pixel.r = (uint8_t) Mathematics::Constrain((Rmult * refpixel.R * UMult) / 3, 0, 190);
-                    pixel.g = (uint8_t) Mathematics::Constrain((Rmult * refpixel.G * UMult) / 3, 0, 190);
-                    pixel.b = (uint8_t) Mathematics::Constrain((Rmult * refpixel.B * UMult) / 3, 0, 190);
+                    pixel.r = (uint8_t) Mathematics::Constrain(bassScale, 0, 190);
+                    pixel.g = (uint8_t) Mathematics::Constrain((float) refpixel.G - (bassScale / MAX_BRIGHTNESS / 0.7f)*refpixel.G, 0, 190);
+                    pixel.b = (uint8_t) Mathematics::Constrain((float) refpixel.B - (bassScale / MAX_BRIGHTNESS / 0.7f)*refpixel.B, 0, 190);
                     smoothing(num, pixel);
                 }
                 //Serial.println("-----------------");
             }        
             else if((lLow > LowMax*0.25f)  && (lLow <= LowMax*0.50f) ){
-                if (ev.kick && now-prevkick > 30 && lLow > LowMax * 0.6f){
-                    StartPulse(trans_white_pixel, 60, 1050, now-prevkick);
-                    StartBrightnessPulse(-0.5f, 0.4f);
-                    prevkick = millis();
-                    gNoiseMat.HueShift(currentHue + x * 360 * 10);
-                }
 
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain(currentBrightness*Rmult/25, this->MinBright, MAX_BRIGHTNESS / 3));
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain(currentBrightness*Gmult + MinBright, this->MinBright, MAX_BRIGHTNESS / 2));
 
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.2f);
                     RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
-                    pixel.r = (uint8_t) Mathematics::Constrain((Rmult * refpixel.R * UMult)/7, 0, 150);
-                    pixel.g = (uint8_t) Mathematics::Constrain((Gmult * refpixel.G * UMult)/7, 0, 150);
-                    pixel.b = (uint8_t) Mathematics::Constrain((Bmult * refpixel.B * UMult)/7, 0, 150);
+                    pixel.r = (uint8_t) Mathematics::Constrain((Rmult * refpixel.R * UMult)/7, 0, 190);
+                    pixel.g = (uint8_t) Mathematics::Constrain((Gmult * refpixel.G * UMult)/7, 0, 190);
+                    pixel.b = (uint8_t) Mathematics::Constrain((Bmult * refpixel.B * UMult)/7, 0, 190);
                     smoothing(num, pixel);
                 }
                 //Serial.println("--------");
@@ -540,7 +535,7 @@ class LEDStrip{
             static int silCt = 0;
             auto smoothBright = [&] (){
                 // Smoothing + Amplification
-                const float brightSmooth = 0.3f;  // strong pumping feel (adjust as desired)
+                const float brightSmooth = 0.4f;  // strong pumping feel (adjust as desired)
 
                 // Get the brightness your audio logic produced this frame
                 uint8_t target = FastLED.getBrightness();
