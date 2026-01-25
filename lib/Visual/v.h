@@ -367,7 +367,7 @@ class LEDStrip{
             {
                 // Smoothing factor between 0.0 and 1.0  
                 // Lower = smoother (slower changes), Higher = faster response
-                const float smoothFactor = 0.5f;  
+                const float smoothFactor = 0.35f;  
 
                 CRGB oldPix = prevLed[num];
 
