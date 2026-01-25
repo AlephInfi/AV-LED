@@ -10,11 +10,11 @@
 */
 #define LED_VOLTS       5
 #define LEDPIN          14
-#define NUM_LEDS        600
+#define NUM_LEDS        720
 
 //#define DEBUG
 
-#define MAX_BRIGHTNESS    255 //Maximum brightness
+#define MAX_BRIGHTNESS    190 //Maximum brightness
 
 class LEDStrip{
     private:
@@ -51,6 +51,7 @@ class LEDStrip{
 
         int RunningAverageDiff;
         uint8_t MinBright = 0;
+        uint8_t oMinBr = 0;
         int rafilter[50];
         
         CRGB trans_white_pixel = CRGB(200, 200, 200);
@@ -106,12 +107,12 @@ class LEDStrip{
 
         BeatEvent detectBeats() {
             // --- Tunable parameters ---
-            static const float SMOOTH_LOW   = 0.90f;
-            static const float SMOOTH_MID   = 0.92f;
-            static const float SMOOTH_HIGH  = 0.93f;
+            static const float SMOOTH_LOW   = 0.2f;
+            static const float SMOOTH_MID   = 0.5f;
+            static const float SMOOTH_HIGH  = 0.5f;
 
-            static const float THRESH_LOW   = 1.15f;
-            static const float THRESH_TRANS = 1.00f;   // transient (mid/high) for kick
+            static const float THRESH_LOW   = 0.90f;
+            static const float THRESH_TRANS = 0.8f;   // transient (mid/high) for kick
             static const float THRESH_SNARE = 1.0f;
             static const float THRESH_HIHAT = 1.1f;
 
@@ -125,16 +126,16 @@ class LEDStrip{
             static bool initialized = false;
 
             if (!initialized) {
-                avgLow  = rca.getBandAvg(0, 3) * rca.getBandAvg(0, 3);    // 30–120 Hz  → bass
-                avgMid  = rca.getBandAvg(4, 10);    // 200–800 Hz → snare body
-                avgHigh = rca.getBandAvg(11, 15);  // 2–6 kHz    → hi-hat/transients
+                avgLow  = rca.getBandAvg(0, 2) * rca.getBandAvg(0, 1) * 0.7f;    // 30–120 Hz  → bass
+                avgMid  = rca.getBandAvg(3, 6);    // 200–800 Hz → snare body
+                avgHigh = rca.getBandAvg(7, 15);  // 2–6 kHz    → hi-hat/transients
                 initialized = true;
             }
 
             // --- Read current energies ---
-            float lowNow  = rca.getBandAvg(0, 3) * rca.getBandAvg(0, 3);
-            float midNow  = rca.getBandAvg(3, 8);
-            float highNow = rca.getBandAvg(8, 15);
+            float lowNow  = rca.getBandAvg(0, 2) * rca.getBandAvg(0, 1) * 0.7f;
+            float midNow  = rca.getBandAvg(3, 6);
+            float highNow = rca.getBandAvg(7, 15);
 
             // --- Exponential moving averages ---
             avgLow  = SMOOTH_LOW  * avgLow  + (1.0f - SMOOTH_LOW)  * lowNow;
@@ -402,7 +403,7 @@ class LEDStrip{
                 float sShift = linSweep * 0.001f;
                 
                 gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
-                gNoiseMat.HueShift(currentHue + x * 180);
+                gNoiseMat.HueShift(currentHue + x * 360);
                 sNoise.SetScale(Vector3D(sShift, sShift, sShift));
                 sNoise.SetZPosition(x * 8.0f);
                 FastLED.setBrightness(MinBright);
@@ -430,30 +431,26 @@ class LEDStrip{
             float sShift = linSweep * 0.00075f + 0.0015f;
             
             gNoiseMat.SetGradientPeriod(0.5f + linSweep * 6.0f);
-            gNoiseMat.HueShift(currentHue + x * 360);
-            sNoise.SetScale(Vector3D(sShift, sShift, sShift));
+            gNoiseMat.HueShift(currentHue + x * 90);
+            sNoise.SetScale(Vector3D(sShift * FastLED.getBrightness()/255, sShift * FastLED.getBrightness()/255, sShift * FastLED.getBrightness()/255));
             sNoise.SetZPosition(x * 8.0f);
 
             long now = millis();
             BeatEvent ev = detectBeats();
-            if (ev.snare && now-prevsnr > 500){
-                StartBrightnessPulse(1.0f, 0.7f);
-                prevsnr = millis();
-            }
 
             if (millis() - prevkick > 5000){
                 HighestLowValue *= 0.5f;
                 HighestMidValue *= 0.5f;
                 HighestHighValue *= 0.5f;
             }
+            if (ev.kick && now-prevkick > 30 && lLow > LowMax*0.4f){
+                StartPulse(trans_white_pixel, 60, 1050, now-prevkick);
+                StartBrightnessPulse(-0.5f, 0.4f);
+                prevkick = millis();
+                gNoiseMat.HueShift(currentHue + x * 360 * 20);
+            }
             
-            if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue * 0.6f) && (lLow > LowMax*0.65f)){
-                if (ev.kick && now-prevkick > 30 && lLow > LowMax * 0.6f){
-                    StartPulse(trans_white_pixel, 60, 1050, now-prevkick);
-                    StartBrightnessPulse(-0.5f, 0.4f);
-                    prevkick = millis();
-                }
-
+            if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue * 0.6f) && (lLow > LowMax*0.50f)){
                 FastLED.setBrightness((uint8_t) Mathematics::Constrain((float)(currentBrightness*Rmult + MinBright), this->MinBright, MAX_BRIGHTNESS));
 
                 for(int num = 0; num < NUM_LEDS; num++){
@@ -466,11 +463,12 @@ class LEDStrip{
                 }
                 //Serial.println("-----------------");
             }        
-            else if((lLow > LowMax*0.45f)  && (lLow <= LowMax*0.65f) ){
+            else if((lLow > LowMax*0.25f)  && (lLow <= LowMax*0.50f) ){
                 if (ev.kick && now-prevkick > 30 && lLow > LowMax * 0.6f){
                     StartPulse(trans_white_pixel, 60, 1050, now-prevkick);
                     StartBrightnessPulse(-0.5f, 0.4f);
                     prevkick = millis();
+                    gNoiseMat.HueShift(currentHue + x * 360 * 10);
                 }
 
                 FastLED.setBrightness((uint8_t) Mathematics::Constrain(currentBrightness*Rmult/25, this->MinBright, MAX_BRIGHTNESS / 3));
@@ -521,6 +519,7 @@ class LEDStrip{
             FastLED.addLeds<WS2812B, LEDPIN, GRB>(led, NUM_LEDS);
             FastLED.setBrightness(min);
 
+            this->oMinBr = min;
             this->MinBright = min;
         }
 
@@ -603,13 +602,29 @@ class LEDStrip{
             if (lLow > HighestLowValue) HighestLowValue = lLow;
 
             // If all bands are consistently below noise floor → silence
+            static long inactivityCounter = millis();
+            static long newOnDuration = millis();
             
             if ((lLow < (HighestLowValue * 0.25f) && mid < (HighestMidValue * 0.25f) && high < (HighestHighValue * 0.25f)) ||
                 (lLow < 100 && mid < 100 && high < 200) || 
                 !recvSound) {
-                if (millis() - silenceTimer > 120) noAudio = true;
+                if (millis() - silenceTimer > 120) {
+                    noAudio = true;
+
+                    if (millis() - inactivityCounter >= 3000){
+                        if(MinBright > 8) MinBright--;
+                        inactivityCounter = millis();
+                    }
+                    newOnDuration = millis();
+                }
             } else {
                 silenceTimer = millis();
+
+                if (millis() - newOnDuration > 1000) {
+                    inactivityCounter = millis();
+                    MinBright = oMinBr;
+                    newOnDuration = millis();
+                }
                 noAudio = false;
             }
 
@@ -639,6 +654,7 @@ class LEDStrip{
             if (added < MinBright) added = MinBright;
 
             FastLED.setBrightness(added);
+
             FastLED.show();
         }
 };

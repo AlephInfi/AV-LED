@@ -4,8 +4,8 @@ LEDStrip strip;
 
 void setup(){
   #ifdef DEBUG
-  Serial.begin(115200);
-  while (!Serial) {;}
+    //Serial.begin(115200);
+    //while (!Serial) {;}
   #endif
 
   strip.Init(27);
