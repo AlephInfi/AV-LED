@@ -437,36 +437,43 @@ class LEDStrip{
 
             long now = millis();
             BeatEvent ev = detectBeats();
+            static uint8_t randcol = 0;
+            static uint8_t randcol2 = 0;
+            static uint8_t randcol3 = 0;
 
             if (millis() - prevkick > 5000){
                 HighestLowValue *= 0.5f;
                 HighestMidValue *= 0.5f;
                 HighestHighValue *= 0.5f;
             }
-            if (ev.hihat && now-prevkick > 30 && lLow > LowMax*0.4f){ // hihat for hardstyle transients
-                StartPulse(trans_white_pixel, 60, 1050, now-prevkick);
-                StartBrightnessPulse(-0.5f, 0.4f);
+            if (ev.hihat && now-prevkick > 240 && lLow > LowMax*0.4f){ // hihat for hardstyle transients
+                StartPulse(CRGB(random(0, 255), random(0, 255), random(0, 255)), 20, 200, now-prevkick);
                 prevkick = millis();
-                gNoiseMat.HueShift(currentHue + x * 360 * 20);
+                gNoiseMat.HueShift(60);
+                randcol = random(10, 20);
+                randcol2 = random(1, 20);
+                randcol3 = random(1, 20);
             }
             
             if( ((LowMax - lLow) <= this->RunningAverageDiff * 2.55f) && (LowMax >= HighestLowValue * 0.6f) && (lLow > LowMax*0.50f)){
-                float bassScale = (uint8_t) Mathematics::Constrain((float)(currentBrightness*Rmult + MinBright), this->MinBright, MAX_BRIGHTNESS * 0.7f);
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain((bassScale * bassScale) / (MAX_BRIGHTNESS*0.4f), 0, MAX_BRIGHTNESS));
+                float bassScale = (uint8_t) Mathematics::Constrain((float)(currentBrightness*Rmult + MinBright), this->MinBright, MAX_BRIGHTNESS);
+
+                if (bassScale > 75) FastLED.setBrightness((uint8_t) Mathematics::Map((float)Mathematics::Constrain((bassScale * bassScale) / (MAX_BRIGHTNESS*0.4f) - 190.0f, 0, MAX_BRIGHTNESS - 190.0f)  , 0.0f, MAX_BRIGHTNESS - 190.0f, 0.0f, MAX_BRIGHTNESS));
+                else FastLED.setBrightness((uint8_t) Mathematics::Map((float)Mathematics::Constrain((bassScale * bassScale) / (MAX_BRIGHTNESS*0.4f) - 130.0f, 0, MAX_BRIGHTNESS)  , 0.0f, MAX_BRIGHTNESS - 130.0f, 15.0f, MAX_BRIGHTNESS));
 
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.2f);
                     RGBColor refpixel = sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D());
-                    pixel.r = (uint8_t) Mathematics::Constrain(bassScale, 0, 190);
-                    pixel.g = (uint8_t) Mathematics::Constrain((float) refpixel.G - (bassScale / MAX_BRIGHTNESS / 0.7f)*refpixel.G, 0, 190);
-                    pixel.b = (uint8_t) Mathematics::Constrain((float) refpixel.B - (bassScale / MAX_BRIGHTNESS / 0.7f)*refpixel.B, 0, 190);
+                    pixel.r = (uint8_t) Mathematics::Constrain(bassScale, 0, 190) * (randcol / 20);
+                    pixel.g = (uint8_t) Mathematics::Constrain((float) refpixel.G - (bassScale / MAX_BRIGHTNESS / 0.7f)*refpixel.G, 0, 190) * (randcol2 / 45);
+                    pixel.b = (uint8_t) Mathematics::Constrain((float) refpixel.B - (bassScale / MAX_BRIGHTNESS / 0.7f)*refpixel.B, 0, 190) * (randcol3 / 45);
                     smoothing(num, pixel);
                 }
                 //Serial.println("-----------------");
             }        
             else if((lLow > LowMax*0.25f)  && (lLow <= LowMax*0.50f) ){
 
-                FastLED.setBrightness((uint8_t) Mathematics::Constrain(currentBrightness*Gmult + MinBright, this->MinBright, MAX_BRIGHTNESS / 2));
+                FastLED.setBrightness((uint8_t) Mathematics::Constrain(currentBrightness*Gmult*0.5f + currentBrightness*Bmult*0.5f + MinBright, this->MinBright, MAX_BRIGHTNESS * 0.6f));
 
                 for(int num = 0; num < NUM_LEDS; num++){
                     CRGB pixel = RGBColorToRgb(sNoise.GetRGB(Vector3D(num,num,num), Vector3D(), Vector3D()), 0.2f);
@@ -479,8 +486,7 @@ class LEDStrip{
                 //Serial.println("--------");
             }
             else{
-                //FastLED.setBrightness((uint8_t)(Mathematics::Constrain(currentBrightness*Rmult/30, 5, MAX_BRIGHTNESS / 8)));
-                FastLED.setBrightness(0);
+                FastLED.setBrightness((uint8_t)(Mathematics::Constrain(currentBrightness*Gmult*0.3f + currentBrightness*Bmult*0.7f, this->MinBright, MAX_BRIGHTNESS * 0.2f)));
                 static int sat = 0.8f;
                 //Serial.println("--");
 

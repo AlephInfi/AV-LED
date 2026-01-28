@@ -85,9 +85,19 @@ class RCA{
             }
 
             // boosting lows for punchier kicks
-            bandValues[0] *= 12;
-            bandValues[1] *= 5;
+            bandValues[0] *= 15;
+            bandValues[1] *= 7;
             bandValues[2] *= 2;
+
+            // boosting highs to detect screams and screeches
+            bandValues[5] *= 2;
+            bandValues[6] *= 9;
+            bandValues[7] *= 13;
+            bandValues[8] *= 15;
+            bandValues[9] *= 10;
+            bandValues[10] *= 5;
+            bandValues[11] *= 2;
+
 
             for (byte band = 0; band < BINS; band++) {
                 int barHeight = bandValues[band] / SENSITIVITY;
