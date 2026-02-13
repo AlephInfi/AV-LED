@@ -446,8 +446,16 @@ class LEDStrip{
                 HighestMidValue *= 0.5f;
                 HighestHighValue *= 0.5f;
             }
-            if (ev.hihat && now-prevkick > 240 && lLow > LowMax*0.4f){ // hihat for hardstyle transients
+            if (ev.hihat && now-prevkick > 240 && lLow > LowMax*0.6f){ // hihat for hardstyle transients
                 StartPulse(CRGB(random(0, 255), random(0, 255), random(0, 255)), 20, 200, now-prevkick);
+                prevkick = millis();
+                gNoiseMat.HueShift(60);
+                randcol = random(10, 20);
+                randcol2 = random(1, 20);
+                randcol3 = random(1, 20);
+            }
+            else if (ev.hihat && now-prevkick > 240 && lLow > LowMax*0.4f){ // hihat for hardstyle transients
+                StartPulse(trans_white_pixel, 20, 200, now-prevkick);
                 prevkick = millis();
                 gNoiseMat.HueShift(60);
                 randcol = random(10, 20);
@@ -567,6 +575,14 @@ class LEDStrip{
             lLow = rca.getBandAvg(0,3);
             float mid = rca.getBandAvg(4, 9);
             float high = rca.getBandAvg(10,16);
+
+            static uint32_t maxvalCt = millis();
+            if (millis()-maxvalCt > 200){
+                if (HighestLowValue > 10) HighestLowValue -= 5;
+                if (HighestMidValue > 10) HighestMidValue -= 5;
+                if (HighestHighValue > 10) HighestHighValue -= 5;
+                if (HighestLowValue > 10) LowMax -= 5;
+            }
 
             static bool noAudio = false;
             static uint32_t silenceTimer = 0;
